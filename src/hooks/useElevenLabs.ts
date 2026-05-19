@@ -8,17 +8,22 @@ interface UseElevenLabsReturn {
   stop: () => void
 }
 
+function teardownAudio(audio: HTMLAudioElement, objectUrl: string | null) {
+  audio.pause()
+  audio.currentTime = 0
+  audio.src = ''
+  audio.load()
+  if (objectUrl) URL.revokeObjectURL(objectUrl)
+}
+
 export function useElevenLabs(onStart?: () => void, onEnd?: () => void): UseElevenLabsReturn {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const objectUrlRef = useRef<string | null>(null)
 
   const stop = useCallback(() => {
     if (audioRef.current) {
-      audioRef.current.pause()
-      audioRef.current.src = ''
-    }
-    if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current)
+      teardownAudio(audioRef.current, objectUrlRef.current)
+      audioRef.current = null
       objectUrlRef.current = null
     }
   }, [])
@@ -63,19 +68,19 @@ export function useElevenLabs(onStart?: () => void, onEnd?: () => void): UseElev
 
     return new Promise((resolve, reject) => {
       audio.onplay = () => onStart?.()
-      audio.onended = () => {
-        URL.revokeObjectURL(url)
+
+      const finish = (err?: Error) => {
+        teardownAudio(audio, objectUrlRef.current)
+        audioRef.current = null
         objectUrlRef.current = null
         onEnd?.()
-        resolve()
+        if (err) reject(err)
+        else resolve()
       }
-      audio.onerror = () => {
-        URL.revokeObjectURL(url)
-        objectUrlRef.current = null
-        onEnd?.()
-        reject(new Error('Audio playback failed'))
-      }
-      audio.play().catch(reject)
+
+      audio.onended = () => finish()
+      audio.onerror = () => finish(new Error('Audio playback failed'))
+      audio.play().catch((e) => finish(e instanceof Error ? e : new Error(String(e))))
     })
   }, [stop, onStart, onEnd])
 

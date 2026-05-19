@@ -106,10 +106,11 @@ export default function App() {
 
   const startRecording = useCallback(() => {
     if (appState !== 'idle') return
+    stop()
     isRecordingRef.current = true
     setAppState('recording')
     startListening()
-  }, [appState, startListening])
+  }, [appState, stop, startListening])
 
   const stopRecording = useCallback(async () => {
     if (!isRecordingRef.current) return

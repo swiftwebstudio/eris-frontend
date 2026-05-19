@@ -23,6 +23,11 @@ interface SpeechRecognitionAlternative {
   readonly confidence: number
 }
 
+interface SpeechRecognitionErrorEvent extends Event {
+  readonly error: string
+  readonly message: string
+}
+
 interface SpeechRecognition extends EventTarget {
   continuous: boolean
   interimResults: boolean
