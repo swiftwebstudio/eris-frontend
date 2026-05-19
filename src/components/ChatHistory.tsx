@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Message } from '../types'
 
@@ -10,6 +10,7 @@ interface ChatHistoryProps {
 export function ChatHistory({ messages, onScrolledUp }: ChatHistoryProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const [scrolledUp, setScrolledUp] = useState(false)
 
   // Auto-scroll to bottom on new message
   useEffect(() => {
@@ -20,7 +21,9 @@ export function ChatHistory({ messages, onScrolledUp }: ChatHistoryProps) {
     const el = containerRef.current
     if (!el) return
     const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
-    onScrolledUp(distFromBottom > 60)
+    const isUp = distFromBottom > 80
+    setScrolledUp(isUp)
+    onScrolledUp(isUp)
   }, [onScrolledUp])
 
   if (messages.length === 0) {
@@ -36,14 +39,14 @@ export function ChatHistory({ messages, onScrolledUp }: ChatHistoryProps) {
     )
   }
 
-  // Fade older messages: last = full, going back: dimmer
+  // When scrolled up: full opacity (reading mode). At rest: soft fade so sphere shows through.
   const total = messages.length
   const getOpacity = (index: number) => {
+    if (scrolledUp) return 1.0
     const fromEnd = total - 1 - index
-    if (fromEnd === 0) return 1
-    if (fromEnd === 1) return 0.65
-    if (fromEnd === 2) return 0.35
-    return 0.12
+    if (fromEnd === 0) return 0.4
+    if (fromEnd === 1) return 0.4
+    return 0.15
   }
 
   return (

@@ -85,8 +85,6 @@ void main(){
 
 const fragmentShader = /* glsl */ `
 uniform float uTime;
-uniform vec3  uColorA;
-uniform vec3  uColorB;
 uniform float uBass;
 uniform float uMid;
 uniform float uTreble;
@@ -99,24 +97,41 @@ void main(){
   vec3 N=normalize(vNormal);
   vec3 V=normalize(cameraPosition-vWorldPos);
   float NdV=max(dot(N,V),0.0);
-  float fresnel=pow(1.0-NdV,2.8);
+  float fresnel=pow(1.0-NdV,2.0);
 
-  // Slow-shifting iridescent hue
-  float shift=sin(uTime*0.25+vDisplace*8.0)*0.5+0.5;
-  vec3 base=mix(uColorA,uColorB,shift*0.5+fresnel*0.6);
+  // Color ramp stops
+  vec3 cNavy  =vec3(0.000,0.102,0.302); // #001A4D
+  vec3 cBlue  =vec3(0.000,0.467,1.000); // #0077FF
+  vec3 cCyan  =vec3(0.000,0.831,1.000); // #00D4FF
+  vec3 cViolet=vec3(0.482,0.380,1.000); // #7B61FF
+  vec3 cPink  =vec3(1.000,0.380,0.863); // #FF61DC
 
-  // White rim
-  base=mix(base,vec3(1.0),pow(fresnel,3.5)*0.75);
+  // Noise-based ramp position, slow time drift
+  float shift=(vDisplace*3.0+sin(uTime*0.3)*0.5)*0.5+0.5;
+  shift=clamp(shift,0.0,1.0);
 
-  // Interior subsurface warmth
-  base+=uColorA*pow(NdV,2.5)*0.25;
+  vec3 base;
+  if(shift<0.25)      base=mix(cNavy,  cBlue,  shift/0.25);
+  else if(shift<0.50) base=mix(cBlue,  cCyan,  (shift-0.25)/0.25);
+  else if(shift<0.75) base=mix(cCyan,  cViolet,(shift-0.50)/0.25);
+  else                base=mix(cViolet,cPink,  (shift-0.75)/0.25);
+
+  // Fresnel edge → bright cyan/pink mix
+  vec3 edgeColor=mix(cCyan,cPink,fresnel);
+  base=mix(base,edgeColor,pow(fresnel,1.5)*0.7);
+
+  // Specular highlight
+  vec3 L=normalize(vec3(1.0,2.0,2.0));
+  vec3 H=normalize(L+V);
+  float spec=pow(max(dot(N,H),0.0),32.0)*0.5;
+  base+=vec3(spec);
 
   // Displacement brightens ridges
-  base+=vDisplace*1.2;
+  base+=vDisplace*0.8;
 
   // Audio response
-  base+=vec3(0.0,0.55,1.0)*uTreble*0.45;
-  base*=1.0+uBass*0.35;
+  base+=vec3(0.0,0.55,1.0)*uTreble*0.35;
+  base*=1.0+uBass*0.25;
 
   gl_FragColor=vec4(base,1.0);
 }
@@ -175,8 +190,6 @@ function ErisSphere({ state, analyser, reducedMotion }: ErisSphereProps) {
     uTime:      { value: 0 },
     uNoiseAmp:  { value: 0.04 },
     uNoiseFreq: { value: 2.4 },
-    uColorA:    { value: new THREE.Color('#0077FF') },
-    uColorB:    { value: new THREE.Color('#00D4FF') },
     uBass:      { value: 0 },
     uMid:       { value: 0 },
     uTreble:    { value: 0 },
@@ -320,18 +333,20 @@ export function SphereCanvas({ state, analyser, sizePx }: SphereCanvasProps) {
 
   return (
     <Canvas
-      style={{ width: sizePx, height: sizePx }}
+      style={{ width: sizePx, height: sizePx, background: 'transparent' }}
       camera={{ position: [0, 0, 3], fov: 42 }}
       gl={{ antialias: true, alpha: true }}
       dpr={[1, 2]}
+      onCreated={({ scene }) => { scene.background = null }}
     >
       <Suspense fallback={null}>
         <ErisSphere state={state} analyser={analyser} reducedMotion={reducedMotion} />
         <EffectComposer>
           <Bloom
-            intensity={1.8}
-            luminanceThreshold={0.05}
+            intensity={0.6}
+            luminanceThreshold={0.7}
             luminanceSmoothing={0.85}
+            radius={0.4}
             mipmapBlur
           />
         </EffectComposer>

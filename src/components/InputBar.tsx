@@ -66,21 +66,21 @@ export function InputBar({
         className="flex items-center gap-2 w-full"
         animate={{
           boxShadow: focused
-            ? '0 0 0 1.5px rgba(0,119,255,0.5), 0 8px 32px rgba(0,119,255,0.15)'
-            : '0 8px 32px rgba(0,0,0,0.4)',
-          borderColor: focused ? 'rgba(0,119,255,0.4)' : 'rgba(255,255,255,0.12)',
+            ? '0 0 0 1px rgba(0,229,255,0.45), 0 8px 40px rgba(0,119,255,0.22), inset 0 1px 0 rgba(255,255,255,0.14)'
+            : '0 8px 40px rgba(0,0,0,0.55), 0 2px 12px rgba(0,50,120,0.3), inset 0 1px 0 rgba(255,255,255,0.08)',
         }}
-        transition={{ duration: 0.2 }}
+        transition={{ duration: 0.25 }}
         style={{
-          background: 'rgba(255,255,255,0.07)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          border: focused ? '1px solid rgba(0,119,255,0.4)' : '1px solid rgba(255,255,255,0.12)',
+          background: focused
+            ? 'linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.05) 100%)'
+            : 'linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 100%)',
+          backdropFilter: 'blur(32px) saturate(1.8)',
+          WebkitBackdropFilter: 'blur(32px) saturate(1.8)',
+          border: focused
+            ? '1px solid rgba(0,229,255,0.35)'
+            : '1px solid rgba(255,255,255,0.10)',
           borderRadius: 9999,
           padding: '10px 12px 10px 16px',
-          boxShadow: focused
-            ? '0 0 0 1.5px rgba(0,119,255,0.3), 0 8px 32px rgba(0,119,255,0.1)'
-            : '0 8px 32px rgba(0,0,0,0.35)',
           maxWidth: 600,
           width: '100%',
         }}
@@ -109,7 +109,7 @@ export function InputBar({
           className="flex-1 bg-transparent text-sm outline-none min-w-0"
           style={{
             color: isRecording ? 'rgba(230,244,255,0.5)' : '#E6F4FF',
-            caretColor: '#0077FF',
+            caretColor: '#00E5FF',
           }}
         />
 

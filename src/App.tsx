@@ -196,18 +196,74 @@ export default function App() {
 
   return (
     <div
-      className="h-screen w-screen flex flex-col overflow-hidden bg-mesh"
-      style={{ background: 'radial-gradient(ellipse 90% 70% at 50% 25%, #001D3D 0%, #000814 70%)' }}
+      className="h-screen w-screen overflow-hidden relative"
+      style={{ background: 'radial-gradient(ellipse 120% 80% at 50% 60%, #001229 0%, #000814 55%, #000510 100%)' }}
     >
+      {/* ── Sphere — fixed at viewport center ──────────────── */}
+      <div
+        className="pointer-events-none fixed inset-0 flex flex-col items-center justify-center"
+        style={{ zIndex: 1 }}
+      >
+        <motion.div
+          animate={{
+            opacity: sphereHidden ? 0.08 : 1,
+            scale: sphereScale,
+            y: sphereHidden ? 16 : 0,
+          }}
+          transition={{ duration: 0.45, ease: 'easeInOut' }}
+        >
+          <Suspense fallback={
+            <div
+              style={{ width: sphereSize, height: sphereSize }}
+              className="flex items-center justify-center"
+            >
+              <div
+                className="rounded-full animate-pulse"
+                style={{
+                  width: sphereSize * 0.7,
+                  height: sphereSize * 0.7,
+                  background: 'radial-gradient(circle, #0077FF22 0%, transparent 70%)',
+                }}
+              />
+            </div>
+          }>
+            <SphereCanvas
+              state={appState}
+              analyser={analyserRef.current}
+              sizePx={sphereSize}
+            />
+          </Suspense>
+        </motion.div>
+
+        {/* Status text */}
+        <div aria-live="polite" aria-atomic="true" className="mt-1 h-5">
+          <AnimatePresence mode="wait">
+            <motion.p
+              key={appState}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.2 }}
+              className="text-xs tracking-widest uppercase text-center"
+              style={{ color: 'rgba(107,143,179,0.7)' }}
+            >
+              {statusText[appState]}
+            </motion.p>
+          </AnimatePresence>
+        </div>
+      </div>
+
       {/* ── Header ─────────────────────────────────────────── */}
-      <header className="shrink-0 flex items-center justify-between px-5 pt-4 pb-2 z-10">
+      <header
+        className="fixed top-0 left-0 right-0 flex items-center justify-between px-5 pt-4 pb-2"
+        style={{ zIndex: 20 }}
+      >
         <h1
           className="text-base font-bold tracking-[0.3em] uppercase"
           style={{ color: 'rgba(230,244,255,0.25)' }}
         >
           ERIS
         </h1>
-
         <button
           onClick={clearConversation}
           className="text-[11px] tracking-widest uppercase transition-colors"
@@ -219,70 +275,19 @@ export default function App() {
         </button>
       </header>
 
-      {/* ── Chat history (above sphere) ─────────────────────── */}
-      <div className="flex-1 flex flex-col min-h-0 relative">
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <ChatHistory messages={messages} onScrolledUp={setSphereScrolledOut} />
-        </div>
-
-        {/* ── Sphere hero zone ─────────────────────────────── */}
-        <div
-          className="shrink-0 flex flex-col items-center"
-          style={{ paddingBottom: 8 }}
-        >
-          <motion.div
-            animate={{
-              opacity: sphereHidden ? 0 : 1,
-              scale: sphereScale,
-              y: sphereHidden ? 40 : 0,
-            }}
-            transition={{ duration: 0.45, ease: 'easeInOut' }}
-            style={{ pointerEvents: sphereHidden ? 'none' : 'auto' }}
-          >
-            <Suspense fallback={
-              <div
-                style={{ width: sphereSize, height: sphereSize }}
-                className="flex items-center justify-center"
-              >
-                <div
-                  className="rounded-full animate-pulse"
-                  style={{
-                    width: sphereSize * 0.7,
-                    height: sphereSize * 0.7,
-                    background: 'radial-gradient(circle, #0077FF33 0%, transparent 70%)',
-                  }}
-                />
-              </div>
-            }>
-              <SphereCanvas
-                state={appState}
-                analyser={analyserRef.current}
-                sizePx={sphereSize}
-              />
-            </Suspense>
-          </motion.div>
-
-          {/* Status text */}
-          <div aria-live="polite" aria-atomic="true" className="mt-1 mb-2 h-5">
-            <AnimatePresence mode="wait">
-              <motion.p
-                key={appState}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.2 }}
-                className="text-xs tracking-widest uppercase text-center"
-                style={{ color: 'rgba(107,143,179,0.7)' }}
-              >
-                {statusText[appState]}
-              </motion.p>
-            </AnimatePresence>
-          </div>
-        </div>
+      {/* ── Chat history — scrollable overlay ──────────────── */}
+      <div
+        className="fixed left-0 right-0 overflow-hidden"
+        style={{ top: 52, bottom: 80, zIndex: 10 }}
+      >
+        <ChatHistory messages={messages} onScrolledUp={setSphereScrolledOut} />
       </div>
 
       {/* ── Input bar ───────────────────────────────────────── */}
-      <div className="shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      <div
+        className="fixed bottom-0 left-0 right-0"
+        style={{ zIndex: 30, paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      >
         <InputBar
           appState={appState}
           interimTranscript={interimTranscript}
