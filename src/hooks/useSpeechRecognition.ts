@@ -3,7 +3,7 @@ import { useRef, useState, useCallback } from 'react'
 interface UseSpeechRecognitionReturn {
   isSupported: boolean
   interimTranscript: string
-  startListening: () => void
+  startListening: () => Promise<void>
   stopListening: () => Promise<string>
 }
 
@@ -54,7 +54,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
     recognitionRef.current = null
   }, [])
 
-  const startListening = useCallback(() => {
+  const startListening = useCallback(async (): Promise<void> => {
     abortCurrent()
     finalTranscriptRef.current = ''
     setInterimTranscript('')

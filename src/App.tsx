@@ -6,9 +6,10 @@ import { AppState, Message } from './types'
 import { MicButton } from './components/MicButton'
 import { ChatThread } from './components/ChatThread'
 import { InstallToast } from './components/InstallToast'
-import { useSpeechRecognition } from './hooks/useSpeechRecognition'
+import { useSpeechInput, isIOS } from './hooks/useSpeechInput'
 import { useElevenLabs } from './hooks/useElevenLabs'
 import { useEris } from './hooks/useEris'
+import { MIC_PERMISSION_KEY } from './hooks/useIOSSpeechRecognition'
 
 const STORAGE_KEY_MESSAGES = 'eris_messages'
 const STORAGE_KEY_CONVO_ID = 'eris_conversation_id'
@@ -61,7 +62,7 @@ export default function App() {
     return msg
   }, [])
 
-  const { isSupported, interimTranscript, startListening, stopListening } = useSpeechRecognition()
+  const { isSupported, interimTranscript, startListening, stopListening } = useSpeechInput()
 
   const handleSpeakStart = useCallback(() => setAppState('speaking'), [])
   const handleSpeakEnd = useCallback(() => setAppState('idle'), [])
@@ -111,21 +112,47 @@ export default function App() {
     [addMessage, addToast, conversationId, sendMessage, speak],
   )
 
-  const startRecording = useCallback(() => {
+  const startRecording = useCallback(async () => {
     if (appState !== 'idle') return
     stop()
     isRecordingRef.current = true
     setAppState('recording')
-    startListening()
-  }, [appState, stop, startListening])
+    try {
+      await startListening()
+    } catch (err) {
+      isRecordingRef.current = false
+      setAppState('idle')
+      const alreadyGranted = !!localStorage.getItem(MIC_PERMISSION_KEY)
+      const isDenied = err instanceof DOMException && err.name === 'NotAllowedError'
+      addToast(
+        isDenied && alreadyGranted
+          ? 'Microphone permission denied — check iOS Settings > ERIS'
+          : isDenied
+            ? 'Allow microphone access when prompted'
+            : 'Microphone error — try again',
+      )
+    }
+  }, [appState, stop, startListening, addToast])
 
   const stopRecording = useCallback(async () => {
     if (!isRecordingRef.current) return
     isRecordingRef.current = false
     setInterimDisplay('')
-    const transcript = await stopListening()
+
+    // On iOS, stopListening includes a network STT call — show interim state
+    if (isIOS) setAppState('transcribing')
+
+    let transcript: string
+    try {
+      transcript = await stopListening()
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Transcription failed')
+      setAppState('idle')
+      return
+    }
+
     await handleTranscript(transcript)
-  }, [stopListening, handleTranscript])
+  }, [stopListening, handleTranscript, addToast])
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -170,6 +197,7 @@ export default function App() {
   const statusText: Record<AppState, string> = {
     idle: 'Hold to speak · Space to push-to-talk',
     recording: 'Listening...',
+    transcribing: 'Transcribing...',
     processing: 'Thinking...',
     speaking: 'ERIS is speaking...',
   }
@@ -212,7 +240,7 @@ export default function App() {
               type="text"
               value={fallbackInput}
               onChange={(e) => setFallbackInput(e.target.value)}
-              placeholder="Speech not supported — type here and press Enter"
+              placeholder="Microphone not available — type here and press Enter"
               className="w-full bg-white/5 border border-purple-700/30 rounded-full px-5 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:border-purple-500/60"
               disabled={appState === 'processing' || appState === 'speaking'}
             />

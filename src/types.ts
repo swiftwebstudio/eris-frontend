@@ -1,4 +1,4 @@
-export type AppState = 'idle' | 'recording' | 'processing' | 'speaking'
+export type AppState = 'idle' | 'recording' | 'transcribing' | 'processing' | 'speaking'
 
 export interface Message {
   id: string
