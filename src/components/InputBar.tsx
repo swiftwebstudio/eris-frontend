@@ -24,6 +24,7 @@ export function InputBar({
 }: InputBarProps) {
   const [text, setText] = useState('')
   const [focused, setFocused] = useState(false)
+  const [hovered, setHovered] = useState(false)
   const unlockedRef = useRef(false)
   const isRecording = appState === 'recording'
   const isBusy = appState === 'processing' || appState === 'speaking' || appState === 'transcribing'
@@ -59,102 +60,129 @@ export function InputBar({
     if (isRecording) onMicStop()
   }
 
-  return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 flex justify-center px-4 pb-6 pt-2">
-      <motion.form
-        onSubmit={handleSubmit}
-        className="flex items-center gap-2 w-full"
-        animate={{
-          boxShadow: focused
-            ? '0 0 0 1px rgba(0,229,255,0.45), 0 8px 40px rgba(0,119,255,0.22), inset 0 1px 0 rgba(255,255,255,0.14)'
-            : '0 8px 40px rgba(0,0,0,0.55), 0 2px 12px rgba(0,50,120,0.3), inset 0 1px 0 rgba(255,255,255,0.08)',
-        }}
-        transition={{ duration: 0.25 }}
-        style={{
-          background: focused
-            ? 'linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.05) 100%)'
-            : 'linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 100%)',
-          backdropFilter: 'blur(32px) saturate(1.8)',
-          WebkitBackdropFilter: 'blur(32px) saturate(1.8)',
-          border: focused
-            ? '1px solid rgba(0,229,255,0.35)'
-            : '1px solid rgba(255,255,255,0.10)',
-          borderRadius: 9999,
-          padding: '10px 12px 10px 16px',
-          maxWidth: 600,
-          width: '100%',
-        }}
-      >
-        {/* Plus placeholder */}
-        <button
-          type="button"
-          className="shrink-0 text-[#6B8FB3] hover:text-[#E6F4FF] transition-colors p-1"
-          aria-label="Attachments (coming soon)"
-          tabIndex={-1}
-        >
-          <Plus size={18} strokeWidth={1.8} />
-        </button>
+  const active = focused || hovered
 
-        {/* Text input */}
-        <input
-          type="text"
-          value={isRecording ? (interimTranscript || '') : text}
-          onChange={(e) => !isRecording && setText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          placeholder={isBusy ? '' : 'Ask anything...'}
-          disabled={isBusy}
-          aria-label="Message input"
-          className="flex-1 bg-transparent text-sm outline-none min-w-0"
+  return (
+    <div className="flex justify-center px-4 pb-6 pt-2">
+      <div
+        className="relative w-full"
+        style={{ maxWidth: 600 }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
+        {/* Animated gradient border glow */}
+        <motion.div
+          className="absolute -inset-px rounded-full pointer-events-none"
+          animate={{
+            opacity: active ? 1 : 0,
+          }}
+          transition={{ duration: 0.3 }}
           style={{
-            color: isRecording ? 'rgba(230,244,255,0.5)' : '#E6F4FF',
-            caretColor: '#00E5FF',
+            background: 'linear-gradient(135deg, rgba(0,229,255,0.5), rgba(0,119,255,0.5), rgba(123,97,255,0.4))',
+            filter: 'blur(6px)',
+            borderRadius: 9999,
           }}
         />
 
-        {/* Mic button */}
-        {isSupported && (
-          <motion.button
-            type="button"
-            aria-label={isRecording ? 'Stop recording' : 'Start voice input'}
-            disabled={isBusy && !isRecording}
-            onPointerDown={handleMicPointerDown}
-            onPointerUp={handleMicPointerUp}
-            onPointerLeave={handleMicPointerUp}
-            className="shrink-0 rounded-full flex items-center justify-center transition-all"
-            style={{
-              width: 36,
-              height: 36,
-              background: isRecording
-                ? 'linear-gradient(135deg,#0077FF,#00D4FF)'
-                : 'rgba(0,119,255,0.18)',
-              boxShadow: isRecording ? '0 0 12px rgba(0,212,255,0.6)' : 'none',
-            }}
-            animate={isRecording ? { scale: [1, 1.08, 1] } : { scale: 1 }}
-            transition={isRecording ? { duration: 0.7, repeat: Infinity } : { duration: 0.15 }}
-          >
-            {isRecording ? (
-              <Square size={14} className="text-white" fill="white" />
-            ) : isBusy ? (
-              <MicOff size={16} style={{ color: '#6B8FB3' }} />
-            ) : (
-              <Mic size={16} className="text-[#E6F4FF]" strokeWidth={1.8} />
-            )}
-          </motion.button>
-        )}
-
-        {/* Text submit (shown only when text is typed) */}
-        {!isSupported && text.trim() && (
+        {/* Glass pill */}
+        <form
+          onSubmit={handleSubmit}
+          className="relative flex items-center gap-3 px-5 py-3.5 rounded-full"
+          style={{
+            background: focused
+              ? 'linear-gradient(180deg, rgba(255,255,255,0.11) 0%, rgba(255,255,255,0.05) 100%)'
+              : 'linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)',
+            backdropFilter: 'blur(32px) saturate(1.6)',
+            WebkitBackdropFilter: 'blur(32px) saturate(1.6)',
+            border: focused
+              ? '1px solid rgba(0,229,255,0.28)'
+              : '1px solid rgba(255,255,255,0.09)',
+            boxShadow: focused
+              ? '0 0 0 1px rgba(0,229,255,0.15), 0 8px 40px rgba(0,119,255,0.18), inset 0 1px 0 rgba(255,255,255,0.12)'
+              : '0 8px 40px rgba(0,0,0,0.5), 0 2px 12px rgba(0,50,120,0.25), inset 0 1px 0 rgba(255,255,255,0.07)',
+            transition: 'background 0.25s, border 0.25s, box-shadow 0.25s',
+          }}
+        >
+          {/* Plus placeholder */}
           <button
-            type="submit"
-            className="shrink-0 text-xs font-medium px-3 py-1.5 rounded-full transition-all"
-            style={{ background: 'rgba(0,119,255,0.25)', color: '#00D4FF' }}
+            type="button"
+            className="shrink-0 transition-colors"
+            style={{ color: 'rgba(255,255,255,0.3)' }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.65)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.3)')}
+            aria-label="Attachments (coming soon)"
+            tabIndex={-1}
           >
-            Send
+            <Plus size={20} strokeWidth={1.6} />
           </button>
-        )}
-      </motion.form>
+
+          {/* Text input */}
+          <input
+            type="text"
+            value={isRecording ? (interimTranscript || '') : text}
+            onChange={(e) => !isRecording && setText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            placeholder={isBusy ? '' : 'Ask anything...'}
+            disabled={isBusy}
+            aria-label="Message input"
+            className="flex-1 bg-transparent outline-none text-base min-w-0"
+            style={{
+              color: isRecording ? 'rgba(230,244,255,0.45)' : 'rgba(230,244,255,0.9)',
+              caretColor: '#00E5FF',
+            }}
+          />
+
+          {/* Placeholder colour via global CSS trick — applied inline to keep perf */}
+
+          {/* Mic button */}
+          {isSupported && (
+            <motion.button
+              type="button"
+              aria-label={isRecording ? 'Stop recording' : 'Start voice input'}
+              disabled={isBusy && !isRecording}
+              onPointerDown={handleMicPointerDown}
+              onPointerUp={handleMicPointerUp}
+              onPointerLeave={handleMicPointerUp}
+              className="shrink-0 rounded-full flex items-center justify-center transition-all"
+              style={{
+                width: 38,
+                height: 38,
+                background: isRecording
+                  ? 'linear-gradient(135deg, #0077FF, #00D4FF)'
+                  : 'rgba(0,229,255,0.12)',
+                boxShadow: isRecording ? '0 0 16px rgba(0,212,255,0.55)' : 'none',
+              }}
+              animate={isRecording ? { scale: [1, 1.08, 1] } : { scale: 1 }}
+              transition={isRecording ? { duration: 0.7, repeat: Infinity } : { duration: 0.15 }}
+            >
+              {isRecording ? (
+                <Square size={13} className="text-white" fill="white" />
+              ) : isBusy ? (
+                <MicOff size={16} style={{ color: 'rgba(107,143,179,0.5)' }} />
+              ) : (
+                <Mic size={16} style={{ color: 'rgba(0,229,255,0.85)' }} strokeWidth={1.8} />
+              )}
+            </motion.button>
+          )}
+
+          {/* Send button (text-only fallback) */}
+          {!isSupported && text.trim() && (
+            <button
+              type="submit"
+              className="shrink-0 text-xs font-medium px-3.5 py-1.5 rounded-full transition-all"
+              style={{
+                background: 'rgba(0,119,255,0.22)',
+                color: '#00D4FF',
+                border: '1px solid rgba(0,119,255,0.2)',
+              }}
+            >
+              Send
+            </button>
+          )}
+        </form>
+      </div>
     </div>
   )
 }

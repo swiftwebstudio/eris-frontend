@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion'
 import { v4 as uuidv4 } from 'uuid'
 import { AppState, Message } from './types'
 import { ChatHistory } from './components/ChatHistory'
@@ -43,9 +43,9 @@ type Toast = { id: string; text: string }
 function useSphereSize() {
   const get = () => {
     const w = window.innerWidth
-    if (w < 480) return 220
-    if (w < 768) return 280
-    return 340
+    if (w < 480) return 260
+    if (w < 768) return 340
+    return 440
   }
   const [size, setSize] = useState(get)
   useEffect(() => {
@@ -65,14 +65,17 @@ const statusText: Record<AppState, string> = {
 }
 
 export default function App() {
-  const [appState, setAppState]         = useState<AppState>('idle')
-  const [messages, setMessages]         = useState<Message[]>(loadMessages)
+  const [appState, setAppState]             = useState<AppState>('idle')
+  const [messages, setMessages]             = useState<Message[]>(loadMessages)
   const [conversationId, setConversationId] = useState(getOrCreateConversationId)
-  const [toasts, setToasts]             = useState<Toast[]>([])
-  const [sphereScrolledOut, setSphereScrolledOut] = useState(false)
-  const [inputFocused] = useState(false)
+  const [toasts, setToasts]                 = useState<Toast[]>([])
   const isRecordingRef = useRef(false)
-  const sphereSize = useSphereSize()
+  const chatRef        = useRef<HTMLDivElement>(null)
+  const sphereSize     = useSphereSize()
+
+  // Scroll-driven sphere opacity (smooth, no state toggle)
+  const { scrollY } = useScroll({ container: chatRef })
+  const sphereOpacity = useTransform(scrollY, [0, 220], [1, 0.07])
 
   const addToast = useCallback((text: string) => {
     const id = uuidv4()
@@ -190,53 +193,76 @@ export default function App() {
     setMessages([])
   }, [])
 
-  // Sphere visibility: hidden when user scrolls chat up OR input is focused on mobile
-  const sphereHidden = sphereScrolledOut
-  const sphereScale  = inputFocused ? 0.88 : 1
-
   return (
-    <div
-      className="h-screen w-screen overflow-hidden relative"
-      style={{ background: 'radial-gradient(ellipse 120% 80% at 50% 60%, #001229 0%, #000814 55%, #000510 100%)' }}
-    >
-      {/* ── Sphere — fixed at viewport center ──────────────── */}
-      <div
-        className="pointer-events-none fixed inset-0 flex flex-col items-center justify-center"
-        style={{ zIndex: 1 }}
-      >
-        <motion.div
-          animate={{
-            opacity: sphereHidden ? 0.08 : 1,
-            scale: sphereScale,
-            y: sphereHidden ? 16 : 0,
+    <div className="h-screen w-screen overflow-hidden relative" style={{ background: '#000814' }}>
+
+      {/* ── Layered animated background ─────────────────────── */}
+      <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(ellipse 100% 70% at 50% 55%, #001229 0%, #000814 50%, #000510 100%)',
           }}
-          transition={{ duration: 0.45, ease: 'easeInOut' }}
-        >
-          <Suspense fallback={
+        />
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(ellipse 55% 40% at 20% 25%, rgba(0,40,100,0.32) 0%, transparent 65%)',
+          }}
+        />
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(ellipse 40% 35% at 78% 78%, rgba(0,30,80,0.22) 0%, transparent 60%)',
+          }}
+        />
+        {/* Pulsing center glow behind sphere */}
+        <div
+          className="absolute rounded-full animate-pulse"
+          style={{
+            width: 600,
+            height: 600,
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'radial-gradient(circle, rgba(0,119,255,0.08) 0%, transparent 70%)',
+            animationDuration: '8s',
+          }}
+        />
+      </div>
+
+      {/* ── Sphere — fixed at viewport center ──────────────── */}
+      <motion.div
+        className="pointer-events-none fixed inset-0 flex flex-col items-center justify-center"
+        style={{ zIndex: 1, opacity: sphereOpacity }}
+      >
+        <Suspense fallback={
+          <div
+            style={{ width: sphereSize, height: sphereSize }}
+            className="flex items-center justify-center"
+          >
             <div
-              style={{ width: sphereSize, height: sphereSize }}
-              className="flex items-center justify-center"
-            >
-              <div
-                className="rounded-full animate-pulse"
-                style={{
-                  width: sphereSize * 0.7,
-                  height: sphereSize * 0.7,
-                  background: 'radial-gradient(circle, #0077FF22 0%, transparent 70%)',
-                }}
-              />
-            </div>
-          }>
-            <SphereCanvas
-              state={appState}
-              analyser={analyserRef.current}
-              sizePx={sphereSize}
+              className="rounded-full animate-pulse"
+              style={{
+                width: sphereSize * 0.5,
+                height: sphereSize * 0.5,
+                background: 'radial-gradient(circle, rgba(0,119,255,0.15) 0%, transparent 70%)',
+              }}
             />
-          </Suspense>
-        </motion.div>
+          </div>
+        }>
+          <SphereCanvas
+            state={appState}
+            analyser={analyserRef.current}
+            sizePx={sphereSize}
+          />
+        </Suspense>
 
         {/* Status text */}
-        <div aria-live="polite" aria-atomic="true" className="mt-1 h-5">
+        <div aria-live="polite" aria-atomic="true" className="mt-2 h-5">
           <AnimatePresence mode="wait">
             <motion.p
               key={appState}
@@ -245,13 +271,13 @@ export default function App() {
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.2 }}
               className="text-xs tracking-widest uppercase text-center"
-              style={{ color: 'rgba(107,143,179,0.7)' }}
+              style={{ color: 'rgba(107,143,179,0.65)' }}
             >
               {statusText[appState]}
             </motion.p>
           </AnimatePresence>
         </div>
-      </div>
+      </motion.div>
 
       {/* ── Header ─────────────────────────────────────────── */}
       <header
@@ -260,16 +286,16 @@ export default function App() {
       >
         <h1
           className="text-base font-bold tracking-[0.3em] uppercase"
-          style={{ color: 'rgba(230,244,255,0.25)' }}
+          style={{ color: 'rgba(230,244,255,0.22)' }}
         >
           ERIS
         </h1>
         <button
           onClick={clearConversation}
           className="text-[11px] tracking-widest uppercase transition-colors"
-          style={{ color: 'rgba(107,143,179,0.4)' }}
-          onMouseEnter={(e) => (e.currentTarget.style.color = 'rgba(107,143,179,0.8)')}
-          onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(107,143,179,0.4)')}
+          style={{ color: 'rgba(107,143,179,0.38)' }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = 'rgba(107,143,179,0.75)')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(107,143,179,0.38)')}
         >
           Clear
         </button>
@@ -280,7 +306,7 @@ export default function App() {
         className="fixed left-0 right-0 overflow-hidden"
         style={{ top: 52, bottom: 80, zIndex: 10 }}
       >
-        <ChatHistory messages={messages} onScrolledUp={setSphereScrolledOut} />
+        <ChatHistory messages={messages} containerRef={chatRef} />
       </div>
 
       {/* ── Input bar ───────────────────────────────────────── */}
@@ -310,10 +336,10 @@ export default function App() {
               exit={{ opacity: 0, y: -6, scale: 0.95 }}
               className="text-xs px-4 py-2.5 rounded-full backdrop-blur-sm"
               style={{
-                background: 'rgba(10,20,40,0.85)',
-                border: '1px solid rgba(0,119,255,0.3)',
+                background: 'rgba(10,20,40,0.88)',
+                border: '1px solid rgba(0,119,255,0.28)',
                 color: '#E6F4FF',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.45)',
               }}
             >
               {toast.text}

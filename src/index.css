@@ -2,6 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Geist Sans font ────────────────────────────────────────────────────── */
+@font-face {
+  font-family: 'Geist';
+  src: url('../node_modules/geist/dist/fonts/geist-sans/Geist-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist';
+  src: url('../node_modules/geist/dist/fonts/geist-sans/Geist-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist';
+  src: url('../node_modules/geist/dist/fonts/geist-sans/Geist-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist';
+  src: url('../node_modules/geist/dist/fonts/geist-sans/Geist-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+
 @layer base {
   *, *::before, *::after { box-sizing: border-box; }
 
@@ -13,7 +39,7 @@
   }
 
   body {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Geist', 'Inter', system-ui, sans-serif;
     background-color: #000814;
     color: #E6F4FF;
     -webkit-font-smoothing: antialiased;
@@ -22,38 +48,43 @@
 
   ::-webkit-scrollbar { width: 3px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(0,119,255,0.25); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,119,255,0.2); border-radius: 2px; }
+
+  /* Input placeholder */
+  input::placeholder { color: rgba(230,244,255,0.28); }
 }
 
 @layer utilities {
-  /* Animated mesh gradient background */
-  .bg-mesh {
-    background:
-      radial-gradient(ellipse 120% 80% at 50% 60%, #001229 0%, #000814 55%, #000510 100%),
-      radial-gradient(ellipse 60% 45% at 20% 20%, rgba(0,40,90,0.35) 0%, transparent 65%),
-      radial-gradient(ellipse 40% 35% at 80% 75%, rgba(0,30,80,0.25) 0%, transparent 60%),
-      radial-gradient(ellipse 30% 25% at 65% 15%, rgba(0,20,60,0.2) 0%, transparent 55%);
-  }
-
   .glass {
     background: rgba(255,255,255,0.06);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
-    border: 1px solid rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.10);
   }
 
   .glow-blue {
-    box-shadow: 0 0 20px rgba(0,119,255,0.4), 0 0 60px rgba(0,119,255,0.15);
+    box-shadow: 0 0 20px rgba(0,119,255,0.35), 0 0 60px rgba(0,119,255,0.12);
   }
 
   .glow-cyan {
-    box-shadow: 0 0 12px rgba(0,229,255,0.5), 0 0 30px rgba(0,212,255,0.2);
+    box-shadow: 0 0 12px rgba(0,229,255,0.45), 0 0 30px rgba(0,212,255,0.18);
+  }
+
+  /* Hide scrollbars while keeping scroll behavior */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 }
 
-/* Mesh background animation */
-@keyframes meshShift {
-  0%   { background-position: 0% 50%; }
-  50%  { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+/* ── Spline canvas transparency ─────────────────────────────────────────── */
+.spline-orb canvas {
+  background: transparent !important;
+}
+/* Hide "Made with Spline" watermark */
+.spline-orb > div > div:last-child {
+  display: none !important;
 }
