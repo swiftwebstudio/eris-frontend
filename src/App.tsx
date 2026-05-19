@@ -66,7 +66,7 @@ export default function App() {
   const handleSpeakStart = useCallback(() => setAppState('speaking'), [])
   const handleSpeakEnd = useCallback(() => setAppState('idle'), [])
 
-  const { speak } = useElevenLabs(handleSpeakStart, handleSpeakEnd)
+  const { speak, stop, unlockAudio } = useElevenLabs(handleSpeakStart, handleSpeakEnd)
   const { sendMessage } = useEris()
 
   useEffect(() => {
@@ -96,8 +96,15 @@ export default function App() {
 
       try {
         await speak(reply)
-      } catch {
-        addToast('Voice synthesis failed — text reply shown above')
+      } catch (err) {
+        const isAutoplayBlocked =
+          err instanceof DOMException &&
+          (err.name === 'NotAllowedError' || err.name === 'AbortError')
+        addToast(
+          isAutoplayBlocked
+            ? 'Tap the mic button to enable voice'
+            : 'Voice synthesis failed — text reply shown above',
+        )
         setAppState('idle')
       }
     },
@@ -216,6 +223,7 @@ export default function App() {
           state={appState}
           onPointerDown={startRecording}
           onPointerUp={stopRecording}
+          unlockAudio={unlockAudio}
         />
 
         <div className="flex flex-col items-center gap-1 min-h-[44px]">

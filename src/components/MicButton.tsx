@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Mic } from 'lucide-react'
 import { AppState } from '../types'
@@ -6,12 +7,24 @@ interface MicButtonProps {
   state: AppState
   onPointerDown: () => void
   onPointerUp: () => void
+  unlockAudio: () => void
 }
 
-export function MicButton({ state, onPointerDown, onPointerUp }: MicButtonProps) {
+export function MicButton({ state, onPointerDown, onPointerUp, unlockAudio }: MicButtonProps) {
   const isRecording = state === 'recording'
   const isProcessing = state === 'processing'
   const isSpeaking = state === 'speaking'
+  const unlockedRef = useRef(false)
+
+  const handlePointerDown = () => {
+    // Synchronously unlock the Audio element on the very first press while
+    // iOS still considers this a trusted user gesture.
+    if (!unlockedRef.current) {
+      unlockedRef.current = true
+      unlockAudio()
+    }
+    onPointerDown()
+  }
 
   return (
     <div className="relative flex items-center justify-center" style={{ width: 160, height: 160 }}>
@@ -80,7 +93,7 @@ export function MicButton({ state, onPointerDown, onPointerUp }: MicButtonProps)
             : {}
         }
         transition={isRecording ? { duration: 0.8, repeat: Infinity } : { duration: 0.15 }}
-        onPointerDown={onPointerDown}
+        onPointerDown={handlePointerDown}
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerUp}
       >
