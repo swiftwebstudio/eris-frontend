@@ -3,7 +3,6 @@ import { useCallback, useRef } from 'react'
 const ELEVENLABS_KEY = import.meta.env.VITE_ELEVENLABS_KEY as string
 const VOICE_ID = import.meta.env.VITE_VOICE_ID as string
 
-// Shortest valid silent MP3 — used to unlock the Audio element inside a user gesture
 const SILENT_MP3 =
   'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA' +
   '//tQxAADB8AhSmxhIIEVCSiJrDCQBTcu3UrAIwUdkRgQbFAZC1CQEwTJ9mjRvBA4UOLD8nKVOWfh+Ul' +
@@ -14,18 +13,45 @@ interface UseElevenLabsReturn {
   speak: (text: string) => Promise<void>
   stop: () => void
   unlockAudio: () => void
+  analyserRef: React.RefObject<AnalyserNode | null>
+}
+
+function teardown(audio: HTMLAudioElement, url: string | null) {
+  audio.pause()
+  audio.currentTime = 0
+  audio.src = ''
+  audio.load()
+  if (url) URL.revokeObjectURL(url)
 }
 
 export function useElevenLabs(onStart?: () => void, onEnd?: () => void): UseElevenLabsReturn {
-  // Single persistent element — never replaced, only its src changes
-  const audioRef = useRef<HTMLAudioElement>(new Audio())
+  const audioRef      = useRef<HTMLAudioElement>(new Audio())
   const isUnlockedRef = useRef(false)
-  const currentBlobUrlRef = useRef<string | null>(null)
+  const blobUrlRef    = useRef<string | null>(null)
 
-  const revokeCurrent = useCallback(() => {
-    if (currentBlobUrlRef.current) {
-      URL.revokeObjectURL(currentBlobUrlRef.current)
-      currentBlobUrlRef.current = null
+  // Web Audio chain — set up once, persisted for the session
+  const audioCtxRef    = useRef<AudioContext | null>(null)
+  const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null)
+  const analyserRef    = useRef<AnalyserNode | null>(null)
+
+  const ensureAnalyser = useCallback(() => {
+    if (analyserRef.current) return
+    try {
+      const ctx = audioCtxRef.current ?? new AudioContext()
+      audioCtxRef.current = ctx
+
+      if (!mediaSourceRef.current) {
+        mediaSourceRef.current = ctx.createMediaElementSource(audioRef.current)
+      }
+
+      const analyser = ctx.createAnalyser()
+      analyser.fftSize = 256
+      analyser.smoothingTimeConstant = 0.8
+      mediaSourceRef.current.connect(analyser)
+      analyser.connect(ctx.destination)
+      analyserRef.current = analyser
+    } catch (e) {
+      console.warn('[ERIS] analyser setup failed:', e)
     }
   }, [])
 
@@ -34,32 +60,31 @@ export function useElevenLabs(onStart?: () => void, onEnd?: () => void): UseElev
     audio.onplay = null
     audio.onended = null
     audio.onerror = null
-    audio.pause()
-    audio.currentTime = 0
-    revokeCurrent()
-    audio.src = ''
-    audio.load()
-  }, [revokeCurrent])
+    teardown(audio, blobUrlRef.current)
+    blobUrlRef.current = null
+  }, [])
 
-  // Must be called synchronously inside a user-gesture event handler.
-  // Sets a silent src and calls play()+pause() so iOS marks this element
-  // as user-activated for all future play() calls.
   const unlockAudio = useCallback(() => {
     if (isUnlockedRef.current) return
     isUnlockedRef.current = true
+
     const audio = audioRef.current
     audio.src = SILENT_MP3
     const p = audio.play()
-    if (p !== undefined) {
-      p.then(() => audio.pause()).catch(() => {})
-    }
+    if (p) p.then(() => audio.pause()).catch(() => {})
+
+    // Prime AudioContext in same gesture tick
+    try {
+      if (!audioCtxRef.current) audioCtxRef.current = new AudioContext()
+      if (audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume().catch(() => {})
+      }
+    } catch {}
   }, [])
 
   const speak = useCallback(
     async (text: string): Promise<void> => {
-      if (!ELEVENLABS_KEY || !VOICE_ID) {
-        throw new Error('ElevenLabs credentials not configured')
-      }
+      if (!ELEVENLABS_KEY || !VOICE_ID) throw new Error('ElevenLabs credentials not configured')
 
       stop()
 
@@ -80,13 +105,17 @@ export function useElevenLabs(onStart?: () => void, onEnd?: () => void): UseElev
         },
       )
 
-      if (!response.ok) {
-        throw new Error(`ElevenLabs error: ${response.status}`)
-      }
+      if (!response.ok) throw new Error(`ElevenLabs error: ${response.status}`)
 
       const blob = await response.blob()
       const url = URL.createObjectURL(blob)
-      currentBlobUrlRef.current = url
+      blobUrlRef.current = url
+
+      // Set up analyser now (AudioContext is already primed from unlockAudio)
+      if (audioCtxRef.current?.state === 'suspended') {
+        await audioCtxRef.current.resume().catch(() => {})
+      }
+      ensureAnalyser()
 
       const audio = audioRef.current
       audio.src = url
@@ -97,30 +126,27 @@ export function useElevenLabs(onStart?: () => void, onEnd?: () => void): UseElev
           audio.onplay = null
           audio.onended = null
           audio.onerror = null
-          if (currentBlobUrlRef.current === url) revokeCurrent()
+          if (blobUrlRef.current === url) {
+            URL.revokeObjectURL(url)
+            blobUrlRef.current = null
+          }
           onEnd?.()
         }
 
-        audio.onplay = () => onStart?.()
+        audio.onplay  = () => onStart?.()
         audio.onended = () => { cleanup(); resolve() }
         audio.onerror = () => { cleanup(); reject(new Error('Audio playback failed')) }
 
         try {
           const p = audio.play()
-          if (p !== undefined) {
-            p.catch((err: unknown) => {
-              cleanup()
-              reject(err instanceof Error ? err : new Error(String(err)))
-            })
-          }
-        } catch (err) {
-          cleanup()
-          reject(err instanceof Error ? err : new Error(String(err)))
+          if (p) p.catch((e: unknown) => { cleanup(); reject(e) })
+        } catch (e) {
+          cleanup(); reject(e)
         }
       })
     },
-    [stop, revokeCurrent, onStart, onEnd],
+    [stop, ensureAnalyser, onStart, onEnd],
   )
 
-  return { speak, stop, unlockAudio }
+  return { speak, stop, unlockAudio, analyserRef }
 }

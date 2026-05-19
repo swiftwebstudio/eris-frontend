@@ -1,15 +1,18 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Trash2 } from 'lucide-react'
 import { v4 as uuidv4 } from 'uuid'
 import { AppState, Message } from './types'
-import { MicButton } from './components/MicButton'
-import { ChatThread } from './components/ChatThread'
+import { ChatHistory } from './components/ChatHistory'
+import { InputBar } from './components/InputBar'
 import { InstallToast } from './components/InstallToast'
 import { useSpeechInput, isIOS } from './hooks/useSpeechInput'
 import { useElevenLabs } from './hooks/useElevenLabs'
 import { useEris } from './hooks/useEris'
 import { MIC_PERMISSION_KEY } from './hooks/useIOSSpeechRecognition'
+
+const SphereCanvas = lazy(() =>
+  import('./components/Sphere').then((m) => ({ default: m.SphereCanvas })),
+)
 
 const STORAGE_KEY_MESSAGES = 'eris_messages'
 const STORAGE_KEY_CONVO_ID = 'eris_conversation_id'
@@ -37,22 +40,47 @@ function saveMessages(messages: Message[]) {
 
 type Toast = { id: string; text: string }
 
+function useSphereSize() {
+  const get = () => {
+    const w = window.innerWidth
+    if (w < 480) return 220
+    if (w < 768) return 280
+    return 340
+  }
+  const [size, setSize] = useState(get)
+  useEffect(() => {
+    const handler = () => setSize(get())
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+  return size
+}
+
+const statusText: Record<AppState, string> = {
+  idle:         'Tap to speak',
+  recording:    'Listening...',
+  transcribing: 'Transcribing...',
+  processing:   'Thinking...',
+  speaking:     'Speaking...',
+}
+
 export default function App() {
-  const [appState, setAppState] = useState<AppState>('idle')
-  const [messages, setMessages] = useState<Message[]>(loadMessages)
+  const [appState, setAppState]         = useState<AppState>('idle')
+  const [messages, setMessages]         = useState<Message[]>(loadMessages)
   const [conversationId, setConversationId] = useState(getOrCreateConversationId)
-  const [toasts, setToasts] = useState<Toast[]>([])
-  const [interimDisplay, setInterimDisplay] = useState('')
-  const [fallbackInput, setFallbackInput] = useState('')
+  const [toasts, setToasts]             = useState<Toast[]>([])
+  const [sphereScrolledOut, setSphereScrolledOut] = useState(false)
+  const [inputFocused] = useState(false)
   const isRecordingRef = useRef(false)
+  const sphereSize = useSphereSize()
 
   const addToast = useCallback((text: string) => {
     const id = uuidv4()
     setToasts((prev) => [...prev, { id, text }])
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000)
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4500)
   }, [])
 
-  const addMessage = useCallback((role: 'user' | 'eris', text: string) => {
+  const addMessage = useCallback((role: 'user' | 'eris', text: string): Message => {
     const msg: Message = { id: uuidv4(), role, text, timestamp: Date.now() }
     setMessages((prev) => {
       const next = [...prev, msg]
@@ -62,24 +90,16 @@ export default function App() {
     return msg
   }, [])
 
-  const { isSupported, interimTranscript, startListening, stopListening } = useSpeechInput()
-
   const handleSpeakStart = useCallback(() => setAppState('speaking'), [])
-  const handleSpeakEnd = useCallback(() => setAppState('idle'), [])
+  const handleSpeakEnd   = useCallback(() => setAppState('idle'), [])
 
-  const { speak, stop, unlockAudio } = useElevenLabs(handleSpeakStart, handleSpeakEnd)
+  const { speak, stop, unlockAudio, analyserRef } = useElevenLabs(handleSpeakStart, handleSpeakEnd)
+  const { isSupported, interimTranscript, startListening, stopListening } = useSpeechInput()
   const { sendMessage } = useEris()
-
-  useEffect(() => {
-    setInterimDisplay(interimTranscript)
-  }, [interimTranscript])
 
   const handleTranscript = useCallback(
     async (transcript: string) => {
-      if (!transcript.trim()) {
-        setAppState('idle')
-        return
-      }
+      if (!transcript.trim()) { setAppState('idle'); return }
 
       addMessage('user', transcript)
       setAppState('processing')
@@ -88,7 +108,7 @@ export default function App() {
       try {
         reply = await sendMessage(transcript, conversationId)
       } catch (err) {
-        addToast(err instanceof Error ? err.message : 'Webhook request failed')
+        addToast(err instanceof Error ? err.message : 'Request failed')
         setAppState('idle')
         return
       }
@@ -98,14 +118,10 @@ export default function App() {
       try {
         await speak(reply)
       } catch (err) {
-        const isAutoplayBlocked =
+        const blocked =
           err instanceof DOMException &&
           (err.name === 'NotAllowedError' || err.name === 'AbortError')
-        addToast(
-          isAutoplayBlocked
-            ? 'Tap the mic button to enable voice'
-            : 'Voice synthesis failed — text reply shown above',
-        )
+        addToast(blocked ? 'Tap the mic to enable voice' : 'Voice output failed')
         setAppState('idle')
       }
     },
@@ -122,12 +138,12 @@ export default function App() {
     } catch (err) {
       isRecordingRef.current = false
       setAppState('idle')
-      const alreadyGranted = !!localStorage.getItem(MIC_PERMISSION_KEY)
-      const isDenied = err instanceof DOMException && err.name === 'NotAllowedError'
+      const granted = !!localStorage.getItem(MIC_PERMISSION_KEY)
+      const denied  = err instanceof DOMException && err.name === 'NotAllowedError'
       addToast(
-        isDenied && alreadyGranted
-          ? 'Microphone permission denied — check iOS Settings > ERIS'
-          : isDenied
+        denied && granted
+          ? 'Mic denied — check iOS Settings'
+          : denied
             ? 'Allow microphone access when prompted'
             : 'Microphone error — try again',
       )
@@ -137,11 +153,7 @@ export default function App() {
   const stopRecording = useCallback(async () => {
     if (!isRecordingRef.current) return
     isRecordingRef.current = false
-    setInterimDisplay('')
-
-    // On iOS, stopListening includes a network STT call — show interim state
     if (isIOS) setAppState('transcribing')
-
     let transcript: string
     try {
       transcript = await stopListening()
@@ -150,29 +162,24 @@ export default function App() {
       setAppState('idle')
       return
     }
-
     await handleTranscript(transcript)
   }, [stopListening, handleTranscript, addToast])
 
+  // Spacebar push-to-talk (desktop)
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
+    const down = (e: KeyboardEvent) => {
       if (e.code === 'Space' && e.target === document.body) {
-        e.preventDefault()
-        startRecording()
+        e.preventDefault(); startRecording()
       }
     }
-    const onKeyUp = (e: KeyboardEvent) => {
+    const up = (e: KeyboardEvent) => {
       if (e.code === 'Space' && e.target === document.body) {
-        e.preventDefault()
-        stopRecording()
+        e.preventDefault(); stopRecording()
       }
     }
-    window.addEventListener('keydown', onKeyDown)
-    window.addEventListener('keyup', onKeyUp)
-    return () => {
-      window.removeEventListener('keydown', onKeyDown)
-      window.removeEventListener('keyup', onKeyUp)
-    }
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up) }
   }, [startRecording, stopRecording])
 
   const clearConversation = useCallback(() => {
@@ -183,119 +190,134 @@ export default function App() {
     setMessages([])
   }, [])
 
-  const handleFallbackSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault()
-      const text = fallbackInput.trim()
-      if (!text) return
-      setFallbackInput('')
-      await handleTranscript(text)
-    },
-    [fallbackInput, handleTranscript],
-  )
-
-  const statusText: Record<AppState, string> = {
-    idle: 'Hold to speak · Space to push-to-talk',
-    recording: 'Listening...',
-    transcribing: 'Transcribing...',
-    processing: 'Thinking...',
-    speaking: 'ERIS is speaking...',
-  }
+  // Sphere visibility: hidden when user scrolls chat up OR input is focused on mobile
+  const sphereHidden = sphereScrolledOut
+  const sphereScale  = inputFocused ? 0.88 : 1
 
   return (
     <div
-      className="h-screen w-screen flex flex-col overflow-hidden"
-      style={{
-        background: 'radial-gradient(ellipse at 50% 40%, #12082a 0%, #0A0A0F 70%)',
-      }}
+      className="h-screen w-screen flex flex-col overflow-hidden bg-mesh"
+      style={{ background: 'radial-gradient(ellipse 90% 70% at 50% 25%, #001D3D 0%, #000814 70%)' }}
     >
-      <div className="flex items-center justify-between px-5 py-4 shrink-0">
+      {/* ── Header ─────────────────────────────────────────── */}
+      <header className="shrink-0 flex items-center justify-between px-5 pt-4 pb-2 z-10">
         <h1
-          className="text-lg font-semibold tracking-[0.25em] uppercase"
-          style={{
-            background: 'linear-gradient(135deg, #A855F7, #7C3AED)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-          }}
+          className="text-base font-bold tracking-[0.3em] uppercase"
+          style={{ color: 'rgba(230,244,255,0.25)' }}
         >
           ERIS
         </h1>
 
         <button
           onClick={clearConversation}
-          className="flex items-center gap-1.5 text-xs text-white/30 hover:text-white/60 transition-colors px-2 py-1 rounded"
-          title="Clear conversation"
+          className="text-[11px] tracking-widest uppercase transition-colors"
+          style={{ color: 'rgba(107,143,179,0.4)' }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = 'rgba(107,143,179,0.8)')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(107,143,179,0.4)')}
         >
-          <Trash2 size={13} />
           Clear
         </button>
-      </div>
+      </header>
 
-      <ChatThread messages={messages} />
+      {/* ── Chat history (above sphere) ─────────────────────── */}
+      <div className="flex-1 flex flex-col min-h-0 relative">
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <ChatHistory messages={messages} onScrolledUp={setSphereScrolledOut} />
+        </div>
 
-      <div className="shrink-0 flex flex-col items-center gap-5 pb-10 pt-4">
-        {!isSupported && (
-          <form onSubmit={handleFallbackSubmit} className="w-full max-w-sm px-4">
-            <input
-              type="text"
-              value={fallbackInput}
-              onChange={(e) => setFallbackInput(e.target.value)}
-              placeholder="Microphone not available — type here and press Enter"
-              className="w-full bg-white/5 border border-purple-700/30 rounded-full px-5 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:border-purple-500/60"
-              disabled={appState === 'processing' || appState === 'speaking'}
-            />
-          </form>
-        )}
-
-        <MicButton
-          state={appState}
-          onPointerDown={startRecording}
-          onPointerUp={stopRecording}
-          unlockAudio={unlockAudio}
-        />
-
-        <div className="flex flex-col items-center gap-1 min-h-[44px]">
-          <motion.p
-            key={appState}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-sm text-white/40 tracking-wide"
+        {/* ── Sphere hero zone ─────────────────────────────── */}
+        <div
+          className="shrink-0 flex flex-col items-center"
+          style={{ paddingBottom: 8 }}
+        >
+          <motion.div
+            animate={{
+              opacity: sphereHidden ? 0 : 1,
+              scale: sphereScale,
+              y: sphereHidden ? 40 : 0,
+            }}
+            transition={{ duration: 0.45, ease: 'easeInOut' }}
+            style={{ pointerEvents: sphereHidden ? 'none' : 'auto' }}
           >
-            {statusText[appState]}
-          </motion.p>
-
-          <AnimatePresence>
-            {interimDisplay && (
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="text-sm text-white/25 italic max-w-xs text-center truncate px-4"
+            <Suspense fallback={
+              <div
+                style={{ width: sphereSize, height: sphereSize }}
+                className="flex items-center justify-center"
               >
-                {interimDisplay}
+                <div
+                  className="rounded-full animate-pulse"
+                  style={{
+                    width: sphereSize * 0.7,
+                    height: sphereSize * 0.7,
+                    background: 'radial-gradient(circle, #0077FF33 0%, transparent 70%)',
+                  }}
+                />
+              </div>
+            }>
+              <SphereCanvas
+                state={appState}
+                analyser={analyserRef.current}
+                sizePx={sphereSize}
+              />
+            </Suspense>
+          </motion.div>
+
+          {/* Status text */}
+          <div aria-live="polite" aria-atomic="true" className="mt-1 mb-2 h-5">
+            <AnimatePresence mode="wait">
+              <motion.p
+                key={appState}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.2 }}
+                className="text-xs tracking-widest uppercase text-center"
+                style={{ color: 'rgba(107,143,179,0.7)' }}
+              >
+                {statusText[appState]}
               </motion.p>
-            )}
-          </AnimatePresence>
+            </AnimatePresence>
+          </div>
         </div>
       </div>
 
-      <InstallToast />
+      {/* ── Input bar ───────────────────────────────────────── */}
+      <div className="shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+        <InputBar
+          appState={appState}
+          interimTranscript={interimTranscript}
+          onSubmitText={handleTranscript}
+          onMicStart={startRecording}
+          onMicStop={stopRecording}
+          unlockAudio={unlockAudio}
+          isSupported={isSupported}
+        />
+      </div>
 
-      <div className="fixed bottom-5 left-1/2 -translate-x-1/2 flex flex-col gap-2 z-50 pointer-events-none">
+      {/* ── Error toasts ─────────────────────────────────────── */}
+      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 flex flex-col gap-2 z-50 pointer-events-none">
         <AnimatePresence>
           {toasts.map((toast) => (
             <motion.div
               key={toast.id}
               initial={{ opacity: 0, y: 8, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -8, scale: 0.95 }}
-              className="bg-red-900/80 border border-red-700/50 text-red-200 text-xs px-4 py-2.5 rounded-full backdrop-blur-sm shadow-lg"
+              exit={{ opacity: 0, y: -6, scale: 0.95 }}
+              className="text-xs px-4 py-2.5 rounded-full backdrop-blur-sm"
+              style={{
+                background: 'rgba(10,20,40,0.85)',
+                border: '1px solid rgba(0,119,255,0.3)',
+                color: '#E6F4FF',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+              }}
             >
               {toast.text}
             </motion.div>
           ))}
         </AnimatePresence>
       </div>
+
+      <InstallToast />
     </div>
   )
 }
