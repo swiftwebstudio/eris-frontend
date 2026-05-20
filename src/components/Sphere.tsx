@@ -1,8 +1,7 @@
-import { useRef, useEffect, lazy, Suspense } from 'react'
+import { useRef, useEffect, useState } from 'react'
+import Spline from '@splinetool/react-spline'
 import type { Application } from '@splinetool/runtime'
 import { AppState } from '../types'
-
-const SplineScene = lazy(() => import('@splinetool/react-spline'))
 
 const SCENE_URL = 'https://prod.spline.design/mhZi4foXOwcvfsAu/scene.splinecode'
 
@@ -17,15 +16,19 @@ function lerp(a: number, b: number, t: number) {
 }
 
 export function SphereCanvas({ state, analyser, sizePx }: SphereCanvasProps) {
-  const wrapperRef   = useRef<HTMLDivElement>(null)
-  const appRef       = useRef<Application | null>(null)
-  const dataArr      = useRef<Uint8Array | null>(null)
-  const smoothScale  = useRef(1)
-  const rafRef       = useRef(0)
+  const wrapperRef  = useRef<HTMLDivElement>(null)
+  const appRef      = useRef<Application | null>(null)
+  const dataArr     = useRef<Uint8Array | null>(null)
+  const smoothScale = useRef(1)
+  const rafRef      = useRef(0)
+  const [loaded, setLoaded] = useState(false)
 
   function onLoad(app: Application) {
     appRef.current = app
     console.log('Spline loaded:', app)
+    setLoaded(true)
+    // Force Spline's internal canvas to recalculate dimensions
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 100)
   }
 
   useEffect(() => {
@@ -62,35 +65,37 @@ export function SphereCanvas({ state, analyser, sizePx }: SphereCanvasProps) {
       style={{ width: sizePx, height: sizePx, transformOrigin: 'center' }}
     >
       <div
-        className="spline-container relative"
+        className="spline-container"
         style={{
+          position: 'relative',
           width: sizePx,
           height: sizePx,
-          minWidth: sizePx,
-          minHeight: sizePx,
+          display: 'block',
         }}
       >
-        <Suspense fallback={
+        {/* Gradient fallback sphere — visible until Spline canvas renders */}
+        {!loaded && (
           <div
-            className="flex items-center justify-center"
-            style={{ width: sizePx, height: sizePx }}
-          >
-            <div
-              className="rounded-full animate-pulse"
-              style={{
-                width: sizePx * 0.55,
-                height: sizePx * 0.55,
-                background: 'radial-gradient(circle, rgba(0,119,255,0.18) 0%, transparent 70%)',
-              }}
-            />
-          </div>
-        }>
-          <SplineScene
-            scene={SCENE_URL}
-            onLoad={onLoad}
-            style={{ width: sizePx, height: sizePx, background: 'transparent', display: 'block' }}
+            className="absolute rounded-full pointer-events-none"
+            style={{
+              width: sizePx * 0.55,
+              height: sizePx * 0.55,
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              background: 'radial-gradient(circle at 30% 30%, rgba(120,200,255,0.85), rgba(0,119,255,0.4) 50%, rgba(0,80,200,0.1) 100%)',
+              boxShadow: '0 0 80px rgba(0,212,255,0.5), inset 0 0 60px rgba(0,119,255,0.3)',
+              filter: 'blur(0.5px)',
+              animation: 'hud-breathe 4s ease-in-out infinite',
+            }}
           />
-        </Suspense>
+        )}
+
+        <Spline
+          scene={SCENE_URL}
+          onLoad={onLoad}
+          style={{ width: '100%', height: '100%' }}
+        />
       </div>
     </div>
   )

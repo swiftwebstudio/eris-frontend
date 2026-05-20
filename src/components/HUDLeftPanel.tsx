@@ -12,8 +12,7 @@ const TOOLS = [
 
 interface HUDLeftPanelProps {
   appState: AppState
-  conversationId: string
-  lastLatencyMs: number | null
+  messageCount: number
 }
 
 function useClock() {
@@ -40,6 +39,25 @@ function useClock() {
   return state
 }
 
+function useUptime(): number {
+  const [seconds, setSeconds] = useState(0)
+  useEffect(() => {
+    const start = Date.now()
+    const id = setInterval(() => {
+      setSeconds(Math.floor((Date.now() - start) / 1000))
+    }, 1000)
+    return () => clearInterval(id)
+  }, [])
+  return seconds
+}
+
+function formatUptime(s: number): string {
+  const h   = String(Math.floor(s / 3600)).padStart(2, '0')
+  const m   = String(Math.floor((s % 3600) / 60)).padStart(2, '0')
+  const sec = String(s % 60).padStart(2, '0')
+  return `${h}:${m}:${sec}`
+}
+
 type ConnStatus = 'checking' | 'online' | 'offline'
 
 function useConnectionStatus(): ConnStatus {
@@ -58,23 +76,6 @@ function useConnectionStatus(): ConnStatus {
     return () => clearInterval(id)
   }, [])
   return status
-}
-
-function useSessionNumber(): number {
-  const [num, setNum] = useState(1)
-  useEffect(() => {
-    const current = parseInt(localStorage.getItem('eris_session_count') || '0', 10)
-    const next = current + 1
-    localStorage.setItem('eris_session_count', String(next))
-    setNum(next)
-  }, [])
-  return num
-}
-
-function latencyColor(ms: number): string {
-  if (ms < 500)  return 'rgba(52,211,153,0.9)'
-  if (ms < 1500) return 'rgba(251,191,36,0.9)'
-  return 'rgba(239,68,68,0.9)'
 }
 
 const widgetStyle: React.CSSProperties = {
@@ -122,10 +123,10 @@ const CONN_CONFIG: Record<ConnStatus, { dot: string; glow: string; pulse: boolea
   },
 }
 
-export function HUDLeftPanel({ lastLatencyMs }: HUDLeftPanelProps) {
+export function HUDLeftPanel({ messageCount }: HUDLeftPanelProps) {
   const { time, date } = useClock()
   const connStatus     = useConnectionStatus()
-  const sessionNum     = useSessionNumber()
+  const uptimeSecs     = useUptime()
   const conn           = CONN_CONFIG[connStatus]
 
   return (
@@ -150,27 +151,29 @@ export function HUDLeftPanel({ lastLatencyMs }: HUDLeftPanelProps) {
           </div>
         </div>
 
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="font-mono" style={{ fontSize: 11, color: 'rgba(107,143,179,0.6)' }}>
-              Session
+            <span className="font-mono uppercase tracking-[0.15em]" style={{ fontSize: 10, color: 'rgba(0,212,255,0.5)' }}>
+              Messages
             </span>
-            <span className="font-mono" style={{ fontSize: 11, color: 'rgba(230,244,255,0.55)' }}>
-              #{String(sessionNum).padStart(3, '0')}
+            <span className="font-mono" style={{ fontSize: 12, color: 'rgba(230,244,255,0.8)' }}>
+              {messageCount}
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="font-mono" style={{ fontSize: 11, color: 'rgba(107,143,179,0.6)' }}>
-              Latency
+            <span className="font-mono uppercase tracking-[0.15em]" style={{ fontSize: 10, color: 'rgba(0,212,255,0.5)' }}>
+              Uptime
             </span>
-            <span
-              className="font-mono"
-              style={{
-                fontSize: 11,
-                color: lastLatencyMs !== null ? latencyColor(lastLatencyMs) : 'rgba(107,143,179,0.45)',
-              }}
-            >
-              {lastLatencyMs !== null ? `~${lastLatencyMs}ms` : '—'}
+            <span className="font-mono" style={{ fontSize: 12, color: 'rgba(230,244,255,0.8)' }}>
+              {formatUptime(uptimeSecs)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="font-mono uppercase tracking-[0.15em]" style={{ fontSize: 10, color: 'rgba(0,212,255,0.5)' }}>
+              Model
+            </span>
+            <span className="font-mono" style={{ fontSize: 12, color: 'rgba(230,244,255,0.8)' }}>
+              Sonnet 4.5
             </span>
           </div>
         </div>

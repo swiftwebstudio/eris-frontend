@@ -61,7 +61,6 @@ export default function App() {
   const [conversationId, setConversationId] = useState(getOrCreateConversationId)
   const [toasts, setToasts]               = useState<Toast[]>([])
   const [chatOpen, setChatOpen]           = useState(false)
-  const [lastLatencyMs, setLastLatencyMs] = useState<number | null>(null)
   const [screenWidth, setScreenWidth]     = useState(
     () => typeof window !== 'undefined' ? window.innerWidth : 1280,
   )
@@ -112,10 +111,8 @@ export default function App() {
       setAppState('processing')
 
       let reply: string
-      const t0 = performance.now()
       try {
         reply = await sendMessage(transcript, conversationId)
-        setLastLatencyMs(Math.max(0, Math.round(performance.now() - t0)))
       } catch (err) {
         addToast(err instanceof Error ? err.message : 'Request failed')
         setAppState('idle')
@@ -291,8 +288,7 @@ export default function App() {
         >
           <HUDLeftPanel
             appState={appState}
-            conversationId={conversationId}
-            lastLatencyMs={lastLatencyMs}
+            messageCount={messages.length}
           />
         </div>
       )}

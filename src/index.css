@@ -102,17 +102,30 @@
   50%      { transform: scale(1.18); }
 }
 
-/* ── Spline canvas transparency ─────────────────────────────────────────── */
-.spline-orb canvas {
+/* ── Spline canvas: force fill container, transparent bg ────────────────── */
+.spline-orb canvas,
+.spline-container canvas {
   background: transparent !important;
 }
 .spline-orb > div > div:last-child {
   display: none !important;
 }
 
+/* Force Spline's internal div+canvas tree to fill our explicit-size wrapper */
+.spline-container,
+.spline-container > div,
+.spline-container > div > canvas,
+.spline-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 100% !important;
+  min-height: 100% !important;
+}
+
 /* ── Spline watermark suppression ───────────────────────────────────────── */
 a[href*="spline.design"],
 a[href*="spline"][target="_blank"],
+.spline-container > a,
 .spline-watermark { display: none !important; }
 .spline-container::after {
   content: '';
