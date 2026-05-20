@@ -25,6 +25,7 @@ export function SphereCanvas({ state, analyser, sizePx }: SphereCanvasProps) {
 
   function onLoad(app: Application) {
     appRef.current = app
+    console.log('Spline loaded:', app)
   }
 
   useEffect(() => {
@@ -60,9 +61,20 @@ export function SphereCanvas({ state, analyser, sizePx }: SphereCanvasProps) {
       className="spline-orb"
       style={{ width: sizePx, height: sizePx, transformOrigin: 'center' }}
     >
-      <div className="spline-container relative w-full h-full">
+      <div
+        className="spline-container relative"
+        style={{
+          width: sizePx,
+          height: sizePx,
+          minWidth: sizePx,
+          minHeight: sizePx,
+        }}
+      >
         <Suspense fallback={
-          <div className="w-full h-full flex items-center justify-center">
+          <div
+            className="flex items-center justify-center"
+            style={{ width: sizePx, height: sizePx }}
+          >
             <div
               className="rounded-full animate-pulse"
               style={{
@@ -76,7 +88,7 @@ export function SphereCanvas({ state, analyser, sizePx }: SphereCanvasProps) {
           <SplineScene
             scene={SCENE_URL}
             onLoad={onLoad}
-            style={{ width: '100%', height: '100%', background: 'transparent' }}
+            style={{ width: sizePx, height: sizePx, background: 'transparent', display: 'block' }}
           />
         </Suspense>
       </div>

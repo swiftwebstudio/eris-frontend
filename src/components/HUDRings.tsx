@@ -11,7 +11,7 @@ interface HUDRingsProps {
 }
 
 const SPEEDS: Record<AppState, [string, string, string]> = {
-  idle:         ['60s', '40s', '25s'],
+  idle:         ['45s', '30s', '15s'],
   recording:    ['18s', '13s',  '8s'],
   transcribing: ['28s', '18s', '11s'],
   processing:   ['22s', '14s',  '7s'],
@@ -19,11 +19,11 @@ const SPEEDS: Record<AppState, [string, string, string]> = {
 }
 
 const OPC: Record<AppState, [number, number, number]> = {
-  idle:         [0.28, 0.38, 0.52],
-  recording:    [0.65, 0.75, 0.88],
-  transcribing: [0.42, 0.55, 0.78],
-  processing:   [0.42, 0.58, 0.84],
-  speaking:     [0.48, 0.60, 0.74],
+  idle:         [0.45, 0.58, 0.82],
+  recording:    [0.72, 0.84, 0.96],
+  transcribing: [0.52, 0.68, 0.90],
+  processing:   [0.52, 0.70, 0.94],
+  speaking:     [0.58, 0.72, 0.92],
 }
 
 export const HUDRings = memo(function HUDRings({
@@ -108,15 +108,15 @@ export const HUDRings = memo(function HUDRings({
         style={{
           opacity: outerOp,
           animation: `hud-spin-cw ${outerSpd} linear infinite`,
-          filter: 'drop-shadow(0 0 2px rgba(0,119,255,0.7))',
+          filter: 'drop-shadow(0 0 4px rgba(0,119,255,0.55))',
           transition: 'opacity 0.9s ease',
           willChange: 'transform',
         }}
       >
         <circle
           cx={RO + 2} cy={RO + 2} r={RO}
-          fill="none" stroke="rgba(0,140,255,0.9)"
-          strokeWidth="1" strokeDasharray={DASH_O}
+          fill="none" stroke="rgba(0,160,255,0.95)"
+          strokeWidth="1.5" strokeDasharray={DASH_O}
         />
       </svg>
 
@@ -128,19 +128,19 @@ export const HUDRings = memo(function HUDRings({
         style={{
           opacity: midOp,
           animation: `hud-spin-ccw ${midSpd} linear infinite`,
-          filter: 'drop-shadow(0 0 3px rgba(0,175,255,0.5))',
+          filter: 'drop-shadow(0 0 5px rgba(0,200,255,0.6))',
           transition: 'opacity 0.9s ease',
           willChange: 'transform',
         }}
       >
         <circle
           cx={RM + 2} cy={RM + 2} r={RM}
-          fill="none" stroke="rgba(0,190,255,0.9)"
-          strokeWidth="1.5" strokeDasharray={DASH_M}
+          fill="none" stroke="rgba(0,210,255,0.95)"
+          strokeWidth="2" strokeDasharray={DASH_M}
         />
       </svg>
 
-      {/* Inner ring — fine dashes, CW, brightest */}
+      {/* Inner ring — fine dashes, CW, primary/brightest */}
       <svg
         className="absolute"
         width={RI * 2 + 4}
@@ -148,15 +148,15 @@ export const HUDRings = memo(function HUDRings({
         style={{
           opacity: innerOp,
           animation: `hud-spin-cw ${innerSpd} linear infinite`,
-          filter: 'drop-shadow(0 0 5px rgba(0,229,255,0.75))',
+          filter: 'drop-shadow(0 0 8px rgba(0,229,255,0.9))',
           transition: 'opacity 0.9s ease',
           willChange: 'transform',
         }}
       >
         <circle
           cx={RI + 2} cy={RI + 2} r={RI}
-          fill="none" stroke="rgba(0,229,255,1)"
-          strokeWidth="1.5" strokeDasharray={DASH_I}
+          fill="none" stroke="rgba(0,235,255,1)"
+          strokeWidth="2" strokeDasharray={DASH_I}
         />
       </svg>
 

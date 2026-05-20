@@ -46,10 +46,10 @@ export function ChatHistory({ messages }: ChatHistoryProps) {
           >
             {msg.role === 'eris' && (
               <div
-                className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[10px] font-semibold text-white"
+                className="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[9px] font-semibold text-white"
                 style={{
                   background: 'linear-gradient(135deg, #00D4FF, #0077FF)',
-                  boxShadow: '0 0 10px rgba(0,212,255,0.35)',
+                  boxShadow: '0 0 8px rgba(0,212,255,0.35)',
                 }}
               >
                 E
@@ -57,7 +57,7 @@ export function ChatHistory({ messages }: ChatHistoryProps) {
             )}
 
             <div
-              className="max-w-[85%] px-3.5 py-2.5 rounded-xl text-[13px] leading-relaxed"
+              className="max-w-[85%] px-3 py-2 rounded-xl text-[13px] leading-relaxed"
               style={
                 msg.role === 'user'
                   ? {

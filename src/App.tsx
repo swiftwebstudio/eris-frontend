@@ -74,7 +74,7 @@ export default function App() {
   }, [])
 
   const isDesktop = screenWidth >= 1024
-  const chatWidth = screenWidth >= 1280 ? 380 : 340
+  const chatWidth = screenWidth >= 1280 ? 400 : 340
 
   const SPHERE_PX = isDesktop ? 520 : 280
   const STAGE     = isDesktop ? 1100 : 620
@@ -115,7 +115,7 @@ export default function App() {
       const t0 = performance.now()
       try {
         reply = await sendMessage(transcript, conversationId)
-        setLastLatencyMs(Math.round(performance.now() - t0))
+        setLastLatencyMs(Math.max(0, Math.round(performance.now() - t0)))
       } catch (err) {
         addToast(err instanceof Error ? err.message : 'Request failed')
         setAppState('idle')
@@ -264,7 +264,7 @@ export default function App() {
       {/* ── Status text — below sphere center ──────────────────────── */}
       <div
         className="fixed left-0 right-0 flex justify-center pointer-events-none"
-        style={{ top: `calc(50% + ${SPHERE_PX / 2 + 20}px)`, zIndex: 2 }}
+        style={{ top: `calc(50% + ${SPHERE_PX / 2 + 32}px)`, zIndex: 2 }}
         aria-live="polite"
         aria-atomic="true"
       >
