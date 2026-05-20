@@ -5,6 +5,7 @@ export default {
     extend: {
       fontFamily: {
         sans: ['Geist', 'Inter', 'system-ui', 'sans-serif'],
+        mono: ['"JetBrains Mono"', '"Fira Code"', 'monospace'],
       },
       colors: {
         eris: {

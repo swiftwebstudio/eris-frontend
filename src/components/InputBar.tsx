@@ -1,7 +1,15 @@
 import { useRef, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Plus, Mic, MicOff, Square } from 'lucide-react'
+import { Mic, MicOff, Square } from 'lucide-react'
 import { AppState } from '../types'
+
+const STATE_DOT: Record<AppState, { color: string; glow: string; pulse: boolean }> = {
+  idle:         { color: 'rgba(0,229,255,0.75)',   glow: 'rgba(0,229,255,0.5)',   pulse: false },
+  recording:    { color: 'rgba(52,211,153,0.95)',  glow: 'rgba(52,211,153,0.7)',  pulse: true  },
+  transcribing: { color: 'rgba(251,191,36,0.85)',  glow: 'rgba(251,191,36,0.6)',  pulse: true  },
+  processing:   { color: 'rgba(251,191,36,0.85)',  glow: 'rgba(251,191,36,0.6)',  pulse: true  },
+  speaking:     { color: 'rgba(0,119,255,0.95)',   glow: 'rgba(0,119,255,0.7)',   pulse: false },
+}
 
 interface InputBarProps {
   appState: AppState
@@ -103,18 +111,19 @@ export function InputBar({
             transition: 'background 0.25s, border 0.25s, box-shadow 0.25s',
           }}
         >
-          {/* Plus placeholder */}
-          <button
-            type="button"
-            className="shrink-0 transition-colors"
-            style={{ color: 'rgba(255,255,255,0.3)' }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.65)')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.3)')}
-            aria-label="Attachments (coming soon)"
-            tabIndex={-1}
-          >
-            <Plus size={20} strokeWidth={1.6} />
-          </button>
+          {/* State indicator dot */}
+          <div className="shrink-0 flex items-center justify-center w-8">
+            <div
+              style={{
+                width: 7, height: 7,
+                borderRadius: '50%',
+                background: STATE_DOT[appState].color,
+                boxShadow: `0 0 6px ${STATE_DOT[appState].glow}`,
+                animation: STATE_DOT[appState].pulse ? 'hud-blink 1.2s ease-in-out infinite' : 'none',
+                transition: 'background 0.4s ease, box-shadow 0.4s ease',
+              }}
+            />
+          </div>
 
           {/* Text input */}
           <input
