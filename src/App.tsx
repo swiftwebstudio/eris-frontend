@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { v4 as uuidv4 } from 'uuid'
 import { MessageSquare, X } from 'lucide-react'
@@ -10,14 +10,11 @@ import { HUDBackground } from './components/HUDBackground'
 import { HUDRings } from './components/HUDRings'
 import { HUDLeftPanel } from './components/HUDLeftPanel'
 import { ParticleField } from './components/ParticleField'
+import { LiquidSphere } from './components/LiquidSphere'
 import { useSpeechInput, isIOS } from './hooks/useSpeechInput'
 import { useElevenLabs } from './hooks/useElevenLabs'
 import { useEris } from './hooks/useEris'
 import { MIC_PERMISSION_KEY } from './hooks/useIOSSpeechRecognition'
-
-const SphereCanvas = lazy(() =>
-  import('./components/Sphere').then((m) => ({ default: m.SphereCanvas })),
-)
 
 const STORAGE_KEY_MESSAGES = 'eris_messages'
 const STORAGE_KEY_CONVO_ID = 'eris_conversation_id'
@@ -42,6 +39,14 @@ function saveMessages(messages: Message[]) {
 }
 
 type Toast = { id: string; text: string }
+
+const sphereStateMap = {
+  idle:         'idle',
+  recording:    'listening',
+  transcribing: 'thinking',
+  processing:   'thinking',
+  speaking:     'speaking',
+} as const satisfies Record<AppState, 'idle' | 'listening' | 'thinking' | 'speaking'>
 
 const statusText: Record<AppState, string> = {
   idle:         'STANDBY',
@@ -75,8 +80,7 @@ export default function App() {
   const isDesktop = screenWidth >= 1024
   const chatWidth = screenWidth >= 1280 ? 400 : 340
 
-  const SPHERE_PX = isDesktop ? 520 : 280
-  const STAGE     = isDesktop ? 1100 : 620
+  const STAGE = isDesktop ? 1100 : 620
   const ringProps = isDesktop
     ? { outerR: 520, middleR: 416, innerR: 320 }
     : { outerR: 280, middleR: 220, innerR: 160 }
@@ -212,8 +216,8 @@ export default function App() {
           <div
             className="absolute rounded-full pointer-events-none"
             style={{
-              width: SPHERE_PX * 0.5,
-              height: SPHERE_PX * 0.5,
+              width: 200,
+              height: 200,
               background: 'radial-gradient(circle, rgba(0,119,255,0.14) 0%, rgba(0,119,255,0.03) 45%, transparent 70%)',
               animation: 'hud-breathe 4s ease-in-out infinite',
             }}
@@ -231,29 +235,8 @@ export default function App() {
           />
 
           {/* Sphere */}
-          <div className="relative" style={{ zIndex: 10, pointerEvents: 'auto' }}>
-            <Suspense fallback={
-              <div
-                style={{ width: SPHERE_PX, height: SPHERE_PX }}
-                className="flex items-center justify-center"
-              >
-                <div
-                  className="rounded-full"
-                  style={{
-                    width: SPHERE_PX * 0.55,
-                    height: SPHERE_PX * 0.55,
-                    background: 'radial-gradient(circle, rgba(0,119,255,0.18) 0%, transparent 70%)',
-                    animation: 'hud-breathe 2s ease-in-out infinite',
-                  }}
-                />
-              </div>
-            }>
-              <SphereCanvas
-                state={appState}
-                analyser={analyserRef.current}
-                sizePx={SPHERE_PX}
-              />
-            </Suspense>
+          <div className="relative" style={{ zIndex: 10 }}>
+            <LiquidSphere state={sphereStateMap[appState]} />
           </div>
         </div>
       </div>
@@ -261,7 +244,7 @@ export default function App() {
       {/* ── Status text — below sphere center ──────────────────────── */}
       <div
         className="fixed left-0 right-0 flex justify-center pointer-events-none"
-        style={{ top: `calc(50% + ${SPHERE_PX / 2 + 32}px)`, zIndex: 2 }}
+        style={{ top: 'calc(50% + 172px)', zIndex: 2 }}
         aria-live="polite"
         aria-atomic="true"
       >
