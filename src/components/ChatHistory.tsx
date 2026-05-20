@@ -10,16 +10,17 @@ export function ChatHistory({ messages }: ChatHistoryProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const bottomRef    = useRef<HTMLDivElement>(null)
 
+  // Auto-scroll to bottom on new message
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages.length])
 
   if (messages.length === 0) {
     return (
-      <div className="h-full flex items-end justify-center pb-6 pointer-events-none">
+      <div className="h-full flex flex-col items-center justify-end pb-6 pointer-events-none">
         <p
-          className="font-mono tracking-[0.18em] uppercase"
-          style={{ fontSize: 9, color: 'rgba(107,143,179,0.3)' }}
+          className="font-mono tracking-[0.2em] uppercase"
+          style={{ fontSize: 9, color: 'rgba(107,143,179,0.28)' }}
         >
           NO TRANSMISSIONS
         </p>
@@ -27,28 +28,20 @@ export function ChatHistory({ messages }: ChatHistoryProps) {
     )
   }
 
-  const total = messages.length
-  const opacity = (i: number) => {
-    const fromEnd = total - 1 - i
-    if (fromEnd === 0) return 1
-    if (fromEnd === 1) return 0.8
-    if (fromEnd === 2) return 0.6
-    return 0.42
-  }
-
   return (
     <div
       ref={containerRef}
-      className="h-full overflow-y-auto px-3 pt-2 pb-3 space-y-2.5 scrollbar-hide"
+      className="h-full overflow-y-auto px-4 pt-3 pb-4 flex flex-col gap-2.5"
+      style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(0,212,255,0.15) transparent' }}
     >
       <AnimatePresence initial={false}>
-        {messages.map((msg, i) => (
+        {messages.map((msg) => (
           <motion.div
             key={msg.id}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: opacity(i), y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.28, ease: 'easeOut' }}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
             className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start items-start gap-2'}`}
           >
             {msg.role === 'eris' && (
@@ -56,8 +49,7 @@ export function ChatHistory({ messages }: ChatHistoryProps) {
                 className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[10px] font-semibold text-white"
                 style={{
                   background: 'linear-gradient(135deg, #00D4FF, #0077FF)',
-                  boxShadow: '0 0 10px rgba(0,212,255,0.4)',
-                  fontFamily: 'Geist, sans-serif',
+                  boxShadow: '0 0 10px rgba(0,212,255,0.35)',
                 }}
               >
                 E
@@ -65,19 +57,18 @@ export function ChatHistory({ messages }: ChatHistoryProps) {
             )}
 
             <div
-              className="max-w-[85%] px-3 py-2 rounded-xl text-[12.5px] leading-relaxed backdrop-blur-sm"
+              className="max-w-[85%] px-3.5 py-2.5 rounded-xl text-[13px] leading-relaxed"
               style={
                 msg.role === 'user'
                   ? {
-                      background: 'linear-gradient(135deg, rgba(0,119,255,0.18), rgba(0,90,200,0.10))',
-                      border: '1px solid rgba(0,119,255,0.15)',
-                      color: 'rgba(230,244,255,0.88)',
+                      background: 'linear-gradient(135deg, rgba(0,119,255,0.2), rgba(0,80,190,0.12))',
+                      border: '1px solid rgba(0,119,255,0.18)',
+                      color: 'rgba(230,244,255,0.9)',
                       borderTopRightRadius: 3,
-                      boxShadow: '0 2px 12px rgba(0,119,255,0.07)',
                     }
                   : {
-                      background: 'rgba(255,255,255,0.035)',
-                      border: '1px solid rgba(255,255,255,0.06)',
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(255,255,255,0.07)',
                       color: 'rgba(230,244,255,0.88)',
                       borderTopLeftRadius: 3,
                     }

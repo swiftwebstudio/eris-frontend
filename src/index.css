@@ -109,3 +109,19 @@
 .spline-orb > div > div:last-child {
   display: none !important;
 }
+
+/* ── Spline watermark suppression ───────────────────────────────────────── */
+a[href*="spline.design"],
+a[href*="spline"][target="_blank"],
+.spline-watermark { display: none !important; }
+.spline-container::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 160px;
+  height: 52px;
+  background: rgba(0,8,20,0.95);
+  z-index: 10;
+  pointer-events: none;
+}

@@ -5,9 +5,11 @@ interface HUDRingsProps {
   state: AppState
   analyser: AnalyserNode | null
   reducedMotion: boolean
+  outerR?: number
+  middleR?: number
+  innerR?: number
 }
 
-// [outer, middle, inner] speeds
 const SPEEDS: Record<AppState, [string, string, string]> = {
   idle:         ['60s', '40s', '25s'],
   recording:    ['18s', '13s',  '8s'],
@@ -16,7 +18,6 @@ const SPEEDS: Record<AppState, [string, string, string]> = {
   speaking:     ['42s', '28s', '17s'],
 }
 
-// [outer, middle, inner] opacity
 const OPC: Record<AppState, [number, number, number]> = {
   idle:         [0.28, 0.38, 0.52],
   recording:    [0.65, 0.75, 0.88],
@@ -25,43 +26,18 @@ const OPC: Record<AppState, [number, number, number]> = {
   speaking:     [0.48, 0.60, 0.74],
 }
 
-// Ring radii in px
-const RO = 220, RM = 170, RI = 120
-
-// Circumferences
-const CO = 2 * Math.PI * RO   // ~1382
-const CM = 2 * Math.PI * RM   // ~1068
-
-// Outer: 60 tick marks  (3px tick, variable gap)
-const TICK = 3
-const GAP_O = ((CO / 60) - TICK).toFixed(1)
-const DASH_O = `${TICK} ${GAP_O}`
-
-// Middle: ~10 arc segments (8% of circumference each, 2% gap)
-const ARC = (CM * 0.082).toFixed(1)
-const GAP_M = (CM * 0.033).toFixed(1)
-const DASH_M = `${ARC} ${GAP_M}`
-
-// Inner: fine dashes
-const DASH_I = '6 5'
-
-// Compass N/S/E/W data points
-const COMPASS = [0, 90, 180, 270].map((deg, idx) => {
-  const rad = (deg - 90) * (Math.PI / 180)
-  const d = RO + 16
-  return {
-    x: d * Math.cos(rad),
-    y: d * Math.sin(rad),
-    delay: idx * 0.5,
-    dur: 1.8 + idx * 0.4,
-  }
-})
-
-export const HUDRings = memo(function HUDRings({ state, analyser, reducedMotion }: HUDRingsProps) {
+export const HUDRings = memo(function HUDRings({
+  state,
+  analyser,
+  reducedMotion,
+  outerR: RO = 220,
+  middleR: RM = 170,
+  innerR: RI = 120,
+}: HUDRingsProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const dataArr = useRef<Uint8Array | null>(null)
-  const smooth = useRef(1)
-  const rafRef = useRef(0)
+  const dataArr      = useRef<Uint8Array | null>(null)
+  const smooth       = useRef(1)
+  const rafRef       = useRef(0)
 
   useEffect(() => {
     dataArr.current = analyser ? new Uint8Array(analyser.frequencyBinCount) : null
@@ -78,7 +54,7 @@ export const HUDRings = memo(function HUDRings({ state, analyser, reducedMotion 
         for (let i = 0; i < 6; i++) b += dataArr.current[i]
         bass = b / (6 * 255)
       }
-      const target = state === 'speaking' ? 1 + bass * 0.09 : 1
+      const target = state === 'speaking' ? 1 + bass * 0.08 : 1
       smooth.current += (target - smooth.current) * 0.11
       if (containerRef.current) {
         containerRef.current.style.transform = `scale(${smooth.current.toFixed(4)})`
@@ -92,7 +68,31 @@ export const HUDRings = memo(function HUDRings({ state, analyser, reducedMotion 
   if (reducedMotion) return null
 
   const [outerSpd, midSpd, innerSpd] = SPEEDS[state]
-  const [outerOp, midOp, innerOp] = OPC[state]
+  const [outerOp, midOp, innerOp]    = OPC[state]
+
+  // Circumferences
+  const CO = 2 * Math.PI * RO
+  const CM = 2 * Math.PI * RM
+
+  // Outer: 60 tick marks
+  const TICK  = 3
+  const GAP_O = ((CO / 60) - TICK).toFixed(1)
+  const DASH_O = `${TICK} ${GAP_O}`
+
+  // Middle: ~10 arc segments
+  const ARC   = (CM * 0.082).toFixed(1)
+  const GAP_M = (CM * 0.033).toFixed(1)
+  const DASH_M = `${ARC} ${GAP_M}`
+
+  // Inner: fine dashes
+  const DASH_I = '6 5'
+
+  // Compass data points (N/S/E/W), static around outer ring
+  const compass = [0, 90, 180, 270].map((deg, idx) => {
+    const rad = (deg - 90) * (Math.PI / 180)
+    const d   = RO + 16
+    return { x: d * Math.cos(rad), y: d * Math.sin(rad), delay: idx * 0.5, dur: 1.8 + idx * 0.4 }
+  })
 
   return (
     <div
@@ -161,7 +161,7 @@ export const HUDRings = memo(function HUDRings({ state, analyser, reducedMotion 
       </svg>
 
       {/* Compass data points — static N/S/E/W */}
-      {COMPASS.map(({ x, y, delay, dur }, i) => (
+      {compass.map(({ x, y, delay, dur }, i) => (
         <div
           key={i}
           className="absolute rounded-full"

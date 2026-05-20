@@ -7,7 +7,6 @@ import { ChatHistory } from './components/ChatHistory'
 import { InputBar } from './components/InputBar'
 import { InstallToast } from './components/InstallToast'
 import { HUDBackground } from './components/HUDBackground'
-import { HUDCornerBrackets } from './components/HUDCornerBrackets'
 import { HUDRings } from './components/HUDRings'
 import { HUDLeftPanel } from './components/HUDLeftPanel'
 import { ParticleField } from './components/ParticleField'
@@ -44,18 +43,6 @@ function saveMessages(messages: Message[]) {
 
 type Toast = { id: string; text: string }
 
-function useIsDesktop() {
-  const [desktop, setDesktop] = useState(
-    () => typeof window !== 'undefined' && window.innerWidth >= 1024,
-  )
-  useEffect(() => {
-    const check = () => setDesktop(window.innerWidth >= 1024)
-    window.addEventListener('resize', check)
-    return () => window.removeEventListener('resize', check)
-  }, [])
-  return desktop
-}
-
 const statusText: Record<AppState, string> = {
   idle:         'STANDBY',
   recording:    'LISTENING',
@@ -69,14 +56,31 @@ const reducedMotion =
   window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 export default function App() {
-  const [appState, setAppState]             = useState<AppState>('idle')
-  const [messages, setMessages]             = useState<Message[]>(loadMessages)
+  const [appState, setAppState]           = useState<AppState>('idle')
+  const [messages, setMessages]           = useState<Message[]>(loadMessages)
   const [conversationId, setConversationId] = useState(getOrCreateConversationId)
-  const [toasts, setToasts]                 = useState<Toast[]>([])
-  const [chatOpen, setChatOpen]             = useState(false)
-  const [lastLatencyMs, setLastLatencyMs]   = useState<number | null>(null)
+  const [toasts, setToasts]               = useState<Toast[]>([])
+  const [chatOpen, setChatOpen]           = useState(false)
+  const [lastLatencyMs, setLastLatencyMs] = useState<number | null>(null)
+  const [screenWidth, setScreenWidth]     = useState(
+    () => typeof window !== 'undefined' ? window.innerWidth : 1280,
+  )
   const isRecordingRef = useRef(false)
-  const isDesktop      = useIsDesktop()
+
+  useEffect(() => {
+    const onResize = () => setScreenWidth(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  const isDesktop = screenWidth >= 1024
+  const chatWidth = screenWidth >= 1280 ? 380 : 340
+
+  const SPHERE_PX = isDesktop ? 520 : 280
+  const STAGE     = isDesktop ? 1100 : 620
+  const ringProps = isDesktop
+    ? { outerR: 520, middleR: 416, innerR: 320 }
+    : { outerR: 280, middleR: 220, innerR: 160 }
 
   const addToast = useCallback((text: string) => {
     const id = uuidv4()
@@ -192,175 +196,173 @@ export default function App() {
     setMessages([])
   }, [])
 
-  // Ring composition size (outer ring is 440px wide = r=220)
-  const STAGE = 480
-  const SPHERE_PX = 200
-
   return (
     <div className="h-screen w-screen overflow-hidden relative bg-[#000814]">
 
-      {/* ── Background ────────────────────────────────────────── */}
+      {/* ── Background ─────────────────────────────────────────────── */}
       <HUDBackground />
-      <HUDCornerBrackets />
 
-      {/* ── Main 3-column grid ───────────────────────────────── */}
+      {/* ── Sphere + Rings — fixed, centered in viewport ───────────── */}
       <div
-        className="h-full grid"
-        style={{
-          gridTemplateColumns: isDesktop ? '180px 1fr 300px' : '1fr',
-          paddingBottom: 76,
-        }}
+        className="fixed inset-0 flex items-center justify-center pointer-events-none"
+        style={{ zIndex: 1 }}
       >
-        {/* ── Left panel ──────────────────────────────────────── */}
-        {isDesktop && (
+        <div
+          className="relative flex items-center justify-center"
+          style={{ width: STAGE, height: STAGE, flexShrink: 0 }}
+        >
+          {/* Breathing halo */}
           <div
-            className="flex flex-col overflow-hidden"
+            className="absolute rounded-full pointer-events-none"
             style={{
-              borderRight: '1px solid rgba(0,212,255,0.07)',
-              zIndex: 10,
+              width: SPHERE_PX * 0.5,
+              height: SPHERE_PX * 0.5,
+              background: 'radial-gradient(circle, rgba(0,119,255,0.14) 0%, rgba(0,119,255,0.03) 45%, transparent 70%)',
+              animation: 'hud-breathe 4s ease-in-out infinite',
             }}
-          >
-            <HUDLeftPanel
-              appState={appState}
-              conversationId={conversationId}
-              lastLatencyMs={lastLatencyMs}
-            />
-          </div>
-        )}
+          />
 
-        {/* ── Center — sphere + rings ─────────────────────────── */}
-        <div className="relative flex flex-col items-center justify-center overflow-hidden">
-          {/* Mobile top bar */}
-          {!isDesktop && (
-            <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-5 pt-4 pb-2 z-20">
-              <h1
-                className="text-sm font-bold tracking-[0.3em] uppercase"
-                style={{ color: 'rgba(230,244,255,0.22)' }}
+          {/* Particles */}
+          <ParticleField size={STAGE} disabled={!isDesktop || reducedMotion} />
+
+          {/* Rings */}
+          <HUDRings
+            state={appState}
+            analyser={analyserRef.current}
+            reducedMotion={reducedMotion}
+            {...ringProps}
+          />
+
+          {/* Sphere */}
+          <div className="relative" style={{ zIndex: 10, pointerEvents: 'auto' }}>
+            <Suspense fallback={
+              <div
+                style={{ width: SPHERE_PX, height: SPHERE_PX }}
+                className="flex items-center justify-center"
               >
-                ERIS
-              </h1>
-              <button
-                onClick={clearConversation}
-                className="font-mono uppercase tracking-widest transition-colors"
-                style={{ fontSize: 10, color: 'rgba(107,143,179,0.4)' }}
-              >
-                CLEAR
-              </button>
-            </div>
-          )}
-
-          {/* Stage: all centered elements */}
-          <div
-            className="relative flex items-center justify-center"
-            style={{ width: STAGE, height: STAGE, flexShrink: 0 }}
-          >
-            {/* Inner breathing glow halo */}
-            <div
-              className="absolute rounded-full pointer-events-none"
-              style={{
-                width: 260, height: 260,
-                background: 'radial-gradient(circle, rgba(0,119,255,0.14) 0%, rgba(0,119,255,0.03) 45%, transparent 70%)',
-                animation: 'hud-breathe 4s ease-in-out infinite',
-              }}
-            />
-
-            {/* Particle field */}
-            <ParticleField size={STAGE} disabled={!isDesktop || reducedMotion} />
-
-            {/* Rings */}
-            <HUDRings
-              state={appState}
-              analyser={analyserRef.current}
-              reducedMotion={reducedMotion}
-            />
-
-            {/* Sphere */}
-            <div className="relative" style={{ zIndex: 10 }}>
-              <Suspense fallback={
                 <div
-                  style={{ width: SPHERE_PX, height: SPHERE_PX }}
-                  className="flex items-center justify-center"
-                >
-                  <div
-                    className="rounded-full"
-                    style={{
-                      width: SPHERE_PX * 0.55,
-                      height: SPHERE_PX * 0.55,
-                      background: 'radial-gradient(circle, rgba(0,119,255,0.18) 0%, transparent 70%)',
-                      animation: 'hud-breathe 2s ease-in-out infinite',
-                    }}
-                  />
-                </div>
-              }>
-                <SphereCanvas
-                  state={appState}
-                  analyser={analyserRef.current}
-                  sizePx={SPHERE_PX}
+                  className="rounded-full"
+                  style={{
+                    width: SPHERE_PX * 0.55,
+                    height: SPHERE_PX * 0.55,
+                    background: 'radial-gradient(circle, rgba(0,119,255,0.18) 0%, transparent 70%)',
+                    animation: 'hud-breathe 2s ease-in-out infinite',
+                  }}
                 />
-              </Suspense>
-            </div>
-          </div>
-
-          {/* Status text */}
-          <div aria-live="polite" aria-atomic="true" className="mt-3 h-5">
-            <AnimatePresence mode="wait">
-              <motion.p
-                key={appState}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.2 }}
-                className="font-mono tracking-[0.25em] uppercase text-center"
-                style={{ fontSize: 10, color: 'rgba(0,212,255,0.55)' }}
-              >
-                {statusText[appState]}
-              </motion.p>
-            </AnimatePresence>
+              </div>
+            }>
+              <SphereCanvas
+                state={appState}
+                analyser={analyserRef.current}
+                sizePx={SPHERE_PX}
+              />
+            </Suspense>
           </div>
         </div>
-
-        {/* ── Right panel — chat ────────────────────────────────── */}
-        {isDesktop && (
-          <div
-            className="flex flex-col"
-            style={{
-              borderLeft: '1px solid rgba(0,212,255,0.07)',
-              background: 'rgba(0,8,20,0.35)',
-              backdropFilter: 'blur(32px)',
-              zIndex: 10,
-            }}
-          >
-            {/* Panel header */}
-            <div
-              className="shrink-0 flex items-center justify-between px-4 py-3"
-              style={{ borderBottom: '1px solid rgba(0,212,255,0.07)' }}
-            >
-              <span
-                className="font-mono tracking-[0.18em] uppercase"
-                style={{ fontSize: 9, color: 'rgba(0,212,255,0.45)' }}
-              >
-                CONVERSATION
-              </span>
-              <button
-                onClick={clearConversation}
-                className="font-mono uppercase tracking-widest transition-colors"
-                style={{ fontSize: 8, color: 'rgba(107,143,179,0.35)' }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = 'rgba(107,143,179,0.7)')}
-                onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(107,143,179,0.35)')}
-              >
-                CLEAR
-              </button>
-            </div>
-
-            {/* Messages */}
-            <div className="flex-1 min-h-0 overflow-hidden">
-              <ChatHistory messages={messages} />
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* ── Mobile chat toggle ───────────────────────────────── */}
+      {/* ── Status text — below sphere center ──────────────────────── */}
+      <div
+        className="fixed left-0 right-0 flex justify-center pointer-events-none"
+        style={{ top: `calc(50% + ${SPHERE_PX / 2 + 20}px)`, zIndex: 2 }}
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <AnimatePresence mode="wait">
+          <motion.p
+            key={appState}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.2 }}
+            className="font-mono tracking-[0.25em] uppercase"
+            style={{ fontSize: 10, color: 'rgba(0,212,255,0.55)' }}
+          >
+            {statusText[appState]}
+          </motion.p>
+        </AnimatePresence>
+      </div>
+
+      {/* ── Left panel — floating fixed overlay, desktop only ──────── */}
+      {isDesktop && (
+        <div
+          className="fixed flex flex-col"
+          style={{ top: 20, left: 20, width: 280, zIndex: 20 }}
+        >
+          <HUDLeftPanel
+            appState={appState}
+            conversationId={conversationId}
+            lastLatencyMs={lastLatencyMs}
+          />
+        </div>
+      )}
+
+      {/* ── Right chat — floating fixed overlay, desktop only ──────── */}
+      {isDesktop && (
+        <div
+          className="fixed flex flex-col rounded-2xl overflow-hidden"
+          style={{
+            top: 20,
+            right: 20,
+            bottom: 76,
+            width: chatWidth,
+            background: 'rgba(0,8,20,0.75)',
+            border: '1px solid rgba(0,212,255,0.1)',
+            backdropFilter: 'blur(32px)',
+            WebkitBackdropFilter: 'blur(32px)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
+            zIndex: 20,
+          }}
+        >
+          <div
+            className="shrink-0 flex items-center justify-between px-4 py-3"
+            style={{ borderBottom: '1px solid rgba(0,212,255,0.07)' }}
+          >
+            <span
+              className="font-mono tracking-[0.18em] uppercase"
+              style={{ fontSize: 9, color: 'rgba(0,212,255,0.45)' }}
+            >
+              CONVERSATION
+            </span>
+            <button
+              onClick={clearConversation}
+              className="font-mono uppercase tracking-widest transition-colors"
+              style={{ fontSize: 8, color: 'rgba(107,143,179,0.35)' }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = 'rgba(107,143,179,0.7)')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(107,143,179,0.35)')}
+            >
+              CLEAR
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <ChatHistory messages={messages} />
+          </div>
+        </div>
+      )}
+
+      {/* ── Mobile top bar ─────────────────────────────────────────── */}
+      {!isDesktop && (
+        <div
+          className="fixed top-0 left-0 right-0 flex items-center justify-between px-5 pt-4 pb-2"
+          style={{ zIndex: 20 }}
+        >
+          <h1
+            className="text-sm font-bold tracking-[0.3em] uppercase"
+            style={{ color: 'rgba(230,244,255,0.22)' }}
+          >
+            ERIS
+          </h1>
+          <button
+            onClick={clearConversation}
+            className="font-mono uppercase tracking-widest transition-colors"
+            style={{ fontSize: 10, color: 'rgba(107,143,179,0.4)' }}
+          >
+            CLEAR
+          </button>
+        </div>
+      )}
+
+      {/* ── Mobile chat toggle ─────────────────────────────────────── */}
       {!isDesktop && (
         <button
           onClick={() => setChatOpen(true)}
@@ -394,12 +396,11 @@ export default function App() {
         </button>
       )}
 
-      {/* ── Mobile chat drawer ───────────────────────────────── */}
+      {/* ── Mobile chat drawer ─────────────────────────────────────── */}
       {!isDesktop && (
         <AnimatePresence>
           {chatOpen && (
             <>
-              {/* Backdrop */}
               <motion.div
                 className="fixed inset-0 z-30"
                 style={{ background: 'rgba(0,4,12,0.7)', backdropFilter: 'blur(4px)' }}
@@ -408,7 +409,6 @@ export default function App() {
                 exit={{ opacity: 0 }}
                 onClick={() => setChatOpen(false)}
               />
-              {/* Drawer */}
               <motion.div
                 className="fixed inset-y-0 right-0 flex flex-col z-40"
                 style={{
@@ -455,7 +455,7 @@ export default function App() {
         </AnimatePresence>
       )}
 
-      {/* ── Input bar (fixed bottom, full width) ─────────────── */}
+      {/* ── Input bar (fixed bottom, full width) ───────────────────── */}
       <div
         className="fixed bottom-0 left-0 right-0"
         style={{ zIndex: 30, paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
@@ -471,7 +471,7 @@ export default function App() {
         />
       </div>
 
-      {/* ── Error toasts ─────────────────────────────────────── */}
+      {/* ── Error toasts ───────────────────────────────────────────── */}
       <div className="fixed bottom-24 left-1/2 -translate-x-1/2 flex flex-col gap-2 z-50 pointer-events-none">
         <AnimatePresence>
           {toasts.map((toast) => (

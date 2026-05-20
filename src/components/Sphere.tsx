@@ -60,24 +60,26 @@ export function SphereCanvas({ state, analyser, sizePx }: SphereCanvasProps) {
       className="spline-orb"
       style={{ width: sizePx, height: sizePx, transformOrigin: 'center' }}
     >
-      <Suspense fallback={
-        <div className="w-full h-full flex items-center justify-center">
-          <div
-            className="rounded-full animate-pulse"
-            style={{
-              width: sizePx * 0.55,
-              height: sizePx * 0.55,
-              background: 'radial-gradient(circle, rgba(0,119,255,0.18) 0%, transparent 70%)',
-            }}
+      <div className="spline-container relative w-full h-full">
+        <Suspense fallback={
+          <div className="w-full h-full flex items-center justify-center">
+            <div
+              className="rounded-full animate-pulse"
+              style={{
+                width: sizePx * 0.55,
+                height: sizePx * 0.55,
+                background: 'radial-gradient(circle, rgba(0,119,255,0.18) 0%, transparent 70%)',
+              }}
+            />
+          </div>
+        }>
+          <SplineScene
+            scene={SCENE_URL}
+            onLoad={onLoad}
+            style={{ width: '100%', height: '100%', background: 'transparent' }}
           />
-        </div>
-      }>
-        <SplineScene
-          scene={SCENE_URL}
-          onLoad={onLoad}
-          style={{ width: '100%', height: '100%', background: 'transparent' }}
-        />
-      </Suspense>
+        </Suspense>
+      </div>
     </div>
   )
 }
